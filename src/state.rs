@@ -1,0 +1,394 @@
+use anyhow::Result;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+
+use crate::context::FabricContext;
+use crate::event::{Event, Operation};
+
+// =============================================================================
+// Task State Types
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Task {
+    pub id: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub status: TaskStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee: Option<String>,
+    pub created: DateTime<Utc>,
+    pub created_by: String,
+    pub created_branch: String,
+    pub updated: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default)]
+    pub blocks: Vec<String>,
+    #[serde(default)]
+    pub blocked_by: Vec<String>,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TaskStatus {
+    #[default]
+    Open,
+    Complete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub ts: DateTime<Utc>,
+    pub by: String,
+    pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#ref: Option<String>,
+}
+
+// =============================================================================
+// Index Types
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Index {
+    pub tasks: HashMap<String, TaskIndex>,
+    pub rebuilt: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskIndex {
+    pub status: TaskStatus,
+    pub created: String,
+    pub updated: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed: Option<String>,
+    pub files: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archived: Option<String>,
+}
+
+// =============================================================================
+// State (materialized view)
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct State {
+    pub tasks: HashMap<String, Task>,
+    pub rebuilt: DateTime<Utc>,
+}
+
+// =============================================================================
+// State Materialization
+// =============================================================================
+
+pub fn materialize(ctx: &FabricContext) -> Result<State> {
+    let mut tasks: HashMap<String, Task> = HashMap::new();
+
+    // First process archive files
+    for file in ctx.get_archive_files()? {
+        let events = ctx.parse_events_from_file(&file)?;
+        apply_events(&mut tasks, events);
+    }
+
+    // Then process event files (in chronological order)
+    for file in ctx.get_event_files()? {
+        let events = ctx.parse_events_from_file(&file)?;
+        apply_events(&mut tasks, events);
+    }
+
+    Ok(State {
+        tasks,
+        rebuilt: Utc::now(),
+    })
+}
+
+fn apply_events(tasks: &mut HashMap<String, Task>, events: Vec<Event>) {
+    for event in events {
+        apply_event(tasks, event);
+    }
+}
+
+fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
+    match event.op {
+        Operation::Create => {
+            let d = &event.d;
+            let task = Task {
+                id: event.id.clone(),
+                title: d.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                description: d.get("description").and_then(|v| v.as_str()).map(String::from),
+                status: TaskStatus::Open,
+                priority: d.get("priority").and_then(|v| v.as_str()).map(String::from),
+                tags: d.get("tags")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default(),
+                assignee: d.get("assignee").and_then(|v| v.as_str()).map(String::from),
+                created: event.ts,
+                created_by: event.by.clone(),
+                created_branch: event.branch.clone(),
+                updated: event.ts,
+                completed: None,
+                resolution: None,
+                parent: d.get("parent").and_then(|v| v.as_str()).map(String::from),
+                blocks: d.get("blocks")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default(),
+                blocked_by: d.get("blocked_by")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default(),
+                comments: Vec::new(),
+                archived: None,
+            };
+            tasks.insert(event.id, task);
+        }
+        Operation::Update => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                let d = &event.d;
+                if let Some(title) = d.get("title").and_then(|v| v.as_str()) {
+                    task.title = title.to_string();
+                }
+                if let Some(desc) = d.get("description").and_then(|v| v.as_str()) {
+                    task.description = Some(desc.to_string());
+                }
+                if let Some(priority) = d.get("priority").and_then(|v| v.as_str()) {
+                    task.priority = Some(priority.to_string());
+                }
+                if let Some(tags) = d.get("tags").and_then(|v| v.as_array()) {
+                    task.tags = tags.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+                }
+                task.updated = event.ts;
+            }
+        }
+        Operation::Assign => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                task.assignee = event.d.get("to").and_then(|v| {
+                    if v.is_null() { None } else { v.as_str().map(String::from) }
+                });
+                task.updated = event.ts;
+            }
+        }
+        Operation::Comment => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                let d = &event.d;
+                task.comments.push(Comment {
+                    ts: event.ts,
+                    by: event.by,
+                    body: d.get("body").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    r#ref: d.get("ref").and_then(|v| v.as_str()).map(String::from),
+                });
+                task.updated = event.ts;
+            }
+        }
+        Operation::Link => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                let d = &event.d;
+                if let (Some(rel), Some(target)) = (
+                    d.get("rel").and_then(|v| v.as_str()),
+                    d.get("target").and_then(|v| v.as_str()),
+                ) {
+                    match rel {
+                        "blocks" => {
+                            if !task.blocks.contains(&target.to_string()) {
+                                task.blocks.push(target.to_string());
+                            }
+                        }
+                        "blocked_by" => {
+                            if !task.blocked_by.contains(&target.to_string()) {
+                                task.blocked_by.push(target.to_string());
+                            }
+                        }
+                        "parent" => task.parent = Some(target.to_string()),
+                        _ => {}
+                    }
+                }
+                task.updated = event.ts;
+            }
+        }
+        Operation::Unlink => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                let d = &event.d;
+                if let (Some(rel), Some(target)) = (
+                    d.get("rel").and_then(|v| v.as_str()),
+                    d.get("target").and_then(|v| v.as_str()),
+                ) {
+                    match rel {
+                        "blocks" => task.blocks.retain(|x| x != target),
+                        "blocked_by" => task.blocked_by.retain(|x| x != target),
+                        "parent" => {
+                            if task.parent.as_deref() == Some(target) {
+                                task.parent = None;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                task.updated = event.ts;
+            }
+        }
+        Operation::Complete => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                task.status = TaskStatus::Complete;
+                task.completed = Some(event.ts);
+                task.resolution = event.d
+                    .get("resolution")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .or(Some("done".to_string()));
+                task.updated = event.ts;
+            }
+        }
+        Operation::Reopen => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                task.status = TaskStatus::Open;
+                task.completed = None;
+                task.resolution = None;
+                task.updated = event.ts;
+            }
+        }
+        Operation::Archive => {
+            if let Some(task) = tasks.get_mut(&event.id) {
+                task.archived = event.d.get("ref").and_then(|v| v.as_str()).map(String::from);
+                task.updated = event.ts;
+            }
+        }
+    }
+}
+
+// =============================================================================
+// Index Building
+// =============================================================================
+
+pub fn build_index(ctx: &FabricContext) -> Result<Index> {
+    let mut task_files: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut task_info: HashMap<String, (TaskStatus, String, String, Option<String>, Option<String>)> = HashMap::new();
+
+    for file in ctx.get_event_files()? {
+        let filename = file.file_name().unwrap().to_string_lossy().to_string();
+        let events = ctx.parse_events_from_file(&file)?;
+        for event in events {
+            task_files
+                .entry(event.id.clone())
+                .or_default()
+                .insert(filename.clone());
+
+            let date = event.ts.format("%Y-%m-%d").to_string();
+
+            match event.op {
+                Operation::Create => {
+                    task_info.insert(
+                        event.id.clone(),
+                        (TaskStatus::Open, date.clone(), date, None, None),
+                    );
+                }
+                Operation::Complete => {
+                    if let Some(info) = task_info.get_mut(&event.id) {
+                        info.0 = TaskStatus::Complete;
+                        info.2 = date.clone();
+                        info.3 = Some(date);
+                    }
+                }
+                Operation::Reopen => {
+                    if let Some(info) = task_info.get_mut(&event.id) {
+                        info.0 = TaskStatus::Open;
+                        info.2 = date;
+                        info.3 = None;
+                    }
+                }
+                Operation::Archive => {
+                    if let Some(info) = task_info.get_mut(&event.id) {
+                        info.2 = date;
+                        info.4 = event.d.get("ref").and_then(|v| v.as_str()).map(String::from);
+                    }
+                }
+                _ => {
+                    if let Some(info) = task_info.get_mut(&event.id) {
+                        info.2 = date;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut tasks = HashMap::new();
+    for (id, info) in task_info {
+        let files: Vec<String> = task_files
+            .get(&id)
+            .map(|s| {
+                let mut v: Vec<_> = s.iter().cloned().collect();
+                v.sort();
+                v
+            })
+            .unwrap_or_default();
+
+        tasks.insert(
+            id,
+            TaskIndex {
+                status: info.0,
+                created: info.1,
+                updated: info.2,
+                completed: info.3,
+                files,
+                archived: info.4,
+            },
+        );
+    }
+
+    Ok(Index {
+        tasks,
+        rebuilt: Utc::now(),
+    })
+}
+
+// =============================================================================
+// State Loading
+// =============================================================================
+
+pub fn load_or_materialize_state(ctx: &FabricContext) -> Result<State> {
+    let state_path = ctx.state_path();
+    if state_path.exists() {
+        let content = fs::read_to_string(&state_path)?;
+        let state: State = serde_json::from_str(&content)?;
+        Ok(state)
+    } else {
+        materialize(ctx)
+    }
+}
+
+// =============================================================================
+// Rebuild
+// =============================================================================
+
+pub fn rebuild(ctx: &FabricContext) -> Result<()> {
+    println!("Rebuilding index and state...");
+
+    let index = build_index(ctx)?;
+    let index_json = serde_json::to_string_pretty(&index)?;
+    fs::write(ctx.index_path(), index_json)?;
+    println!("  Wrote .index.json ({} tasks)", index.tasks.len());
+
+    let state = materialize(ctx)?;
+    let state_json = serde_json::to_string_pretty(&state)?;
+    fs::write(ctx.state_path(), state_json)?;
+    println!("  Wrote .state.json ({} tasks)", state.tasks.len());
+
+    println!("Rebuild complete.");
+    Ok(())
+}
