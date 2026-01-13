@@ -35,7 +35,10 @@ fn test_task_status_default() {
 
 #[test]
 fn test_task_status_serialization() {
-    assert_eq!(serde_json::to_string(&TaskStatus::Open).unwrap(), "\"open\"");
+    assert_eq!(
+        serde_json::to_string(&TaskStatus::Open).unwrap(),
+        "\"open\""
+    );
     assert_eq!(
         serde_json::to_string(&TaskStatus::Complete).unwrap(),
         "\"complete\""

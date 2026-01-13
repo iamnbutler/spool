@@ -23,13 +23,27 @@ pub fn validate(ctx: &FabricContext, strict: bool) -> Result<ValidationResult> {
     // Validate event files
     for file in ctx.get_event_files()? {
         let filename = file.file_name().unwrap().to_string_lossy().to_string();
-        validate_event_file(&file, &filename, &mut errors, &mut warnings, &mut seen_ids, &mut created_ids)?;
+        validate_event_file(
+            &file,
+            &filename,
+            &mut errors,
+            &mut warnings,
+            &mut seen_ids,
+            &mut created_ids,
+        )?;
     }
 
     // Validate archive files
     for file in ctx.get_archive_files()? {
         let filename = file.file_name().unwrap().to_string_lossy().to_string();
-        validate_event_file(&file, &filename, &mut errors, &mut warnings, &mut seen_ids, &mut created_ids)?;
+        validate_event_file(
+            &file,
+            &filename,
+            &mut errors,
+            &mut warnings,
+            &mut seen_ids,
+            &mut created_ids,
+        )?;
     }
 
     // Only check for orphaned references if no errors occurred
@@ -84,10 +98,16 @@ pub fn validate(ctx: &FabricContext, strict: bool) -> Result<ValidationResult> {
         }
 
         if strict && !result.errors.is_empty() {
-            return Err(anyhow!("Validation failed with {} errors", result.errors.len()));
+            return Err(anyhow!(
+                "Validation failed with {} errors",
+                result.errors.len()
+            ));
         }
         if strict && !result.warnings.is_empty() {
-            return Err(anyhow!("Validation failed with {} warnings (--strict mode)", result.warnings.len()));
+            return Err(anyhow!(
+                "Validation failed with {} warnings (--strict mode)",
+                result.warnings.len()
+            ));
         }
     }
 
@@ -127,7 +147,12 @@ fn validate_event_file(
         let event: serde_json::Value = match serde_json::from_str(&line) {
             Ok(v) => v,
             Err(e) => {
-                errors.push(format!("{}:{}: Invalid JSON: {}", filename, line_num + 1, e));
+                errors.push(format!(
+                    "{}:{}: Invalid JSON: {}",
+                    filename,
+                    line_num + 1,
+                    e
+                ));
                 continue;
             }
         };

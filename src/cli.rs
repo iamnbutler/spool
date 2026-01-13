@@ -109,9 +109,7 @@ pub fn list_tasks(
                 .unwrap_or(true);
 
             // Tag filter
-            let tag_match = tag
-                .map(|tg| t.tags.iter().any(|t| t == tg))
-                .unwrap_or(true);
+            let tag_match = tag.map(|tg| t.tags.iter().any(|t| t == tg)).unwrap_or(true);
 
             // Priority filter
             let priority_match = priority
@@ -153,7 +151,10 @@ pub fn list_tasks(
                 } else {
                     task.title.clone()
                 };
-                println!("{:<15} {:<10} {:<12} {}", task.id, priority, assignee, title);
+                println!(
+                    "{:<15} {:<10} {:<12} {}",
+                    task.id, priority, assignee, title
+                );
             }
         }
     }
@@ -164,7 +165,10 @@ pub fn list_tasks(
 pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
-    let task = state.tasks.get(id).ok_or_else(|| anyhow!("Task not found: {}", id))?;
+    let task = state
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
 
     println!("ID:       {}", task.id);
     println!("Title:    {}", task.title);
@@ -181,10 +185,17 @@ pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()>
     if let Some(d) = &task.description {
         println!("Description:\n  {}", d.replace('\n', "\n  "));
     }
-    println!("Created:  {} by {} on {}", task.created, task.created_by, task.created_branch);
+    println!(
+        "Created:  {} by {} on {}",
+        task.created, task.created_by, task.created_branch
+    );
     println!("Updated:  {}", task.updated);
     if let Some(c) = task.completed {
-        println!("Completed: {} ({})", c, task.resolution.as_deref().unwrap_or("done"));
+        println!(
+            "Completed: {} ({})",
+            c,
+            task.resolution.as_deref().unwrap_or("done")
+        );
     }
     if let Some(a) = &task.archived {
         println!("Archived: {}", a);
@@ -216,7 +227,10 @@ pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()>
         let all_events = collect_all_events(ctx)?;
         if let Some(events) = all_events.get(id) {
             for event in events {
-                println!("  {} {} by {} on {}", event.ts, event.op, event.by, event.branch);
+                println!(
+                    "  {} {} by {} on {}",
+                    event.ts, event.op, event.by, event.branch
+                );
             }
         }
     }

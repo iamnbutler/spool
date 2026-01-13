@@ -130,13 +130,25 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
             let d = &event.d;
             let task = Task {
                 id: event.id.clone(),
-                title: d.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                description: d.get("description").and_then(|v| v.as_str()).map(String::from),
+                title: d
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                description: d
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
                 status: TaskStatus::Open,
                 priority: d.get("priority").and_then(|v| v.as_str()).map(String::from),
-                tags: d.get("tags")
+                tags: d
+                    .get("tags")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default(),
                 assignee: d.get("assignee").and_then(|v| v.as_str()).map(String::from),
                 created: event.ts,
@@ -146,13 +158,23 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
                 completed: None,
                 resolution: None,
                 parent: d.get("parent").and_then(|v| v.as_str()).map(String::from),
-                blocks: d.get("blocks")
+                blocks: d
+                    .get("blocks")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                blocked_by: d.get("blocked_by")
+                blocked_by: d
+                    .get("blocked_by")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default(),
                 comments: Vec::new(),
                 archived: None,
@@ -172,7 +194,10 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
                     task.priority = Some(priority.to_string());
                 }
                 if let Some(tags) = d.get("tags").and_then(|v| v.as_array()) {
-                    task.tags = tags.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+                    task.tags = tags
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect();
                 }
                 task.updated = event.ts;
             }
@@ -180,7 +205,11 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
         Operation::Assign => {
             if let Some(task) = tasks.get_mut(&event.id) {
                 task.assignee = event.d.get("to").and_then(|v| {
-                    if v.is_null() { None } else { v.as_str().map(String::from) }
+                    if v.is_null() {
+                        None
+                    } else {
+                        v.as_str().map(String::from)
+                    }
                 });
                 task.updated = event.ts;
             }
@@ -191,7 +220,11 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
                 task.comments.push(Comment {
                     ts: event.ts,
                     by: event.by,
-                    body: d.get("body").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    body: d
+                        .get("body")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     r#ref: d.get("ref").and_then(|v| v.as_str()).map(String::from),
                 });
                 task.updated = event.ts;
@@ -247,7 +280,8 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
             if let Some(task) = tasks.get_mut(&event.id) {
                 task.status = TaskStatus::Complete;
                 task.completed = Some(event.ts);
-                task.resolution = event.d
+                task.resolution = event
+                    .d
                     .get("resolution")
                     .and_then(|v| v.as_str())
                     .map(String::from)
@@ -265,7 +299,11 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
         }
         Operation::Archive => {
             if let Some(task) = tasks.get_mut(&event.id) {
-                task.archived = event.d.get("ref").and_then(|v| v.as_str()).map(String::from);
+                task.archived = event
+                    .d
+                    .get("ref")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 task.updated = event.ts;
             }
         }
@@ -278,7 +316,10 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
 
 pub fn build_index(ctx: &FabricContext) -> Result<Index> {
     let mut task_files: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut task_info: HashMap<String, (TaskStatus, String, String, Option<String>, Option<String>)> = HashMap::new();
+    let mut task_info: HashMap<
+        String,
+        (TaskStatus, String, String, Option<String>, Option<String>),
+    > = HashMap::new();
 
     for file in ctx.get_event_files()? {
         let filename = file.file_name().unwrap().to_string_lossy().to_string();
@@ -315,7 +356,11 @@ pub fn build_index(ctx: &FabricContext) -> Result<Index> {
                 Operation::Archive => {
                     if let Some(info) = task_info.get_mut(&event.id) {
                         info.2 = date;
-                        info.4 = event.d.get("ref").and_then(|v| v.as_str()).map(String::from);
+                        info.4 = event
+                            .d
+                            .get("ref")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
                     }
                 }
                 _ => {

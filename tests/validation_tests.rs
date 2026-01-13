@@ -104,7 +104,9 @@ fn test_validation_missing_required_field() {
     write_lines(
         &fabric_dir.join("events"),
         "2024-01-15.jsonl",
-        &[r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","branch":"main","d":{}}"#],
+        &[
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","branch":"main","d":{}}"#,
+        ],
     );
 
     let ctx = create_test_context(&fabric_dir);
@@ -125,7 +127,9 @@ fn test_validation_invalid_timestamp() {
     write_lines(
         &fabric_dir.join("events"),
         "2024-01-15.jsonl",
-        &[r#"{"v":1,"op":"create","id":"task-001","ts":"not-a-timestamp","by":"tester","branch":"main","d":{}}"#],
+        &[
+            r#"{"v":1,"op":"create","id":"task-001","ts":"not-a-timestamp","by":"tester","branch":"main","d":{}}"#,
+        ],
     );
 
     let ctx = create_test_context(&fabric_dir);
@@ -147,7 +151,9 @@ fn test_validation_unknown_schema_version() {
     write_lines(
         &fabric_dir.join("events"),
         "2024-01-15.jsonl",
-        &[r#"{"v":99,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#],
+        &[
+            r#"{"v":99,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#,
+        ],
     );
 
     let ctx = create_test_context(&fabric_dir);
@@ -169,17 +175,16 @@ fn test_validation_event_before_create() {
     write_lines(
         &fabric_dir.join("events"),
         "2024-01-15.jsonl",
-        &[r#"{"v":1,"op":"update","id":"task-orphan","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#],
+        &[
+            r#"{"v":1,"op":"update","id":"task-orphan","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#,
+        ],
     );
 
     let ctx = create_test_context(&fabric_dir);
     let result = fabric::validation::validate(&ctx, false).unwrap();
 
     assert!(!result.warnings.is_empty());
-    assert!(result
-        .warnings
-        .iter()
-        .any(|w| w.contains("before create")));
+    assert!(result.warnings.iter().any(|w| w.contains("before create")));
 }
 
 #[test]
@@ -263,7 +268,9 @@ fn test_validation_strict_mode_warnings() {
     write_lines(
         &fabric_dir.join("events"),
         "2024-01-15.jsonl",
-        &[r#"{"v":1,"op":"update","id":"orphan","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#],
+        &[
+            r#"{"v":1,"op":"update","id":"orphan","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#,
+        ],
     );
 
     let ctx = create_test_context(&fabric_dir);

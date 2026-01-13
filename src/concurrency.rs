@@ -49,10 +49,7 @@ impl FileLock {
         let path = ctx.root.join(".lock");
 
         // Try to create lock file exclusively
-        let lock_file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&path);
+        let lock_file = OpenOptions::new().write(true).create_new(true).open(&path);
 
         match lock_file {
             Ok(mut f) => {
@@ -158,17 +155,13 @@ pub fn write_event_with_version(
         (None, Some(_actual)) => {
             // No expected version but task exists - allow for creates
             if event.op == Operation::Create {
-                return Ok(WriteResult::Error(
-                    "Task already exists".to_string(),
-                ));
+                return Ok(WriteResult::Error("Task already exists".to_string()));
             }
         }
         (None, None) => {
             // No version check needed for new tasks
             if event.op != Operation::Create {
-                return Ok(WriteResult::Error(
-                    "Task does not exist".to_string(),
-                ));
+                return Ok(WriteResult::Error("Task does not exist".to_string()));
             }
         }
     }

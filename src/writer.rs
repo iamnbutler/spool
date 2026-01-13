@@ -52,9 +52,8 @@ pub fn create_task(
         d["assignee"] = serde_json::Value::String(a.to_string());
     }
     if !tags.is_empty() {
-        d["tags"] = serde_json::Value::Array(
-            tags.into_iter().map(serde_json::Value::String).collect()
-        );
+        d["tags"] =
+            serde_json::Value::Array(tags.into_iter().map(serde_json::Value::String).collect());
     }
 
     let event = Event {

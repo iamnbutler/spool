@@ -197,9 +197,19 @@ impl Helper for FabricCompleter {}
 // Command Parsing & Execution
 // =============================================================================
 
-fn parse_add_args(args: &[&str]) -> Result<(String, Option<String>, Option<String>, Option<String>, Vec<String>)> {
+fn parse_add_args(
+    args: &[&str],
+) -> Result<(
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Vec<String>,
+)> {
     if args.is_empty() {
-        return Err(anyhow!("Usage: add <title> [-d description] [-p priority] [-a assignee] [-t tag...]"));
+        return Err(anyhow!(
+            "Usage: add <title> [-d description] [-p priority] [-a assignee] [-t tag...]"
+        ));
     }
 
     let mut title_parts = Vec::new();
@@ -252,7 +262,15 @@ fn parse_add_args(args: &[&str]) -> Result<(String, Option<String>, Option<Strin
     Ok((title, description, priority, assignee, tags))
 }
 
-fn parse_list_args(args: &[&str]) -> (Option<String>, Option<String>, Option<String>, Option<String>, OutputFormat) {
+fn parse_list_args(
+    args: &[&str],
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    OutputFormat,
+) {
     let mut status = Some("open".to_string());
     let mut assignee = None;
     let mut tag = None;
@@ -360,7 +378,10 @@ fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
             show_task(ctx, &id, events)?;
         }
         _ => {
-            println!("Unknown command: {}. Type 'help' for available commands.", cmd);
+            println!(
+                "Unknown command: {}. Type 'help' for available commands.",
+                cmd
+            );
         }
     }
 
