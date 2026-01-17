@@ -10,6 +10,6 @@ pub mod validation;
 pub mod writer;
 
 // Re-export commonly used types
-pub use context::{init, FabricContext};
+pub use context::{init, SpoolContext};
 pub use event::{Event, Operation};
 pub use state::{rebuild, Task, TaskStatus};

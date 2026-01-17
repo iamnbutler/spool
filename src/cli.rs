@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 
 use crate::archive::collect_all_events;
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::state::{load_or_materialize_state, Task, TaskStatus};
 use crate::writer::{
     assign_task as write_assign, complete_task as write_complete, create_task as write_create,
@@ -10,7 +10,7 @@ use crate::writer::{
 };
 
 #[derive(Parser)]
-#[command(name = "fabric")]
+#[command(name = "spool")]
 #[command(about = "Git-native task management system")]
 pub struct Cli {
     #[command(subcommand)]
@@ -19,7 +19,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Initialize .fabric/ directory structure
+    /// Initialize .spool/ directory structure
     Init,
     /// Create a new task
     Add {
@@ -148,7 +148,7 @@ impl OutputFormat {
 }
 
 pub fn list_tasks(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     status_filter: Option<&str>,
     assignee: Option<&str>,
     tag: Option<&str>,
@@ -225,7 +225,7 @@ pub fn list_tasks(
     Ok(())
 }
 
-pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()> {
+pub fn show_task(ctx: &SpoolContext, id: &str, show_events: bool) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     let task = state
@@ -301,7 +301,7 @@ pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()>
     Ok(())
 }
 
-pub fn complete_task(ctx: &FabricContext, id: &str, resolution: Option<&str>) -> Result<()> {
+pub fn complete_task(ctx: &SpoolContext, id: &str, resolution: Option<&str>) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -324,7 +324,7 @@ pub fn complete_task(ctx: &FabricContext, id: &str, resolution: Option<&str>) ->
     Ok(())
 }
 
-pub fn reopen_task(ctx: &FabricContext, id: &str) -> Result<()> {
+pub fn reopen_task(ctx: &SpoolContext, id: &str) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -348,7 +348,7 @@ pub fn reopen_task(ctx: &FabricContext, id: &str) -> Result<()> {
 }
 
 pub fn update_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     id: &str,
     title: Option<&str>,
     description: Option<&str>,
@@ -383,7 +383,7 @@ pub fn update_task(
 }
 
 pub fn add_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     title: &str,
     description: Option<&str>,
     priority: Option<&str>,
@@ -408,7 +408,7 @@ pub fn add_task(
     Ok(())
 }
 
-pub fn assign_task(ctx: &FabricContext, id: &str, assignee: &str) -> Result<()> {
+pub fn assign_task(ctx: &SpoolContext, id: &str, assignee: &str) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -426,7 +426,7 @@ pub fn assign_task(ctx: &FabricContext, id: &str, assignee: &str) -> Result<()> 
     Ok(())
 }
 
-pub fn claim_task(ctx: &FabricContext, id: &str) -> Result<()> {
+pub fn claim_task(ctx: &SpoolContext, id: &str) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -444,7 +444,7 @@ pub fn claim_task(ctx: &FabricContext, id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn free_task(ctx: &FabricContext, id: &str) -> Result<()> {
+pub fn free_task(ctx: &SpoolContext, id: &str) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists

@@ -1,4 +1,4 @@
-//! Interactive shell mode for fabric commands
+//! Interactive shell mode for spool commands
 
 use anyhow::{anyhow, Result};
 use rustyline::completion::{Completer, Pair};
@@ -11,7 +11,7 @@ use rustyline::{Config, Editor, Helper};
 use std::borrow::Cow;
 
 use crate::cli::{complete_task, list_tasks, reopen_task, show_task, update_task, OutputFormat};
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::state::load_or_materialize_state;
 use crate::writer::{create_task, get_current_branch, get_current_user};
 
@@ -20,7 +20,7 @@ const COMMANDS: &[&str] = &[
 ];
 
 const HELP_TEXT: &str = r#"
-fabric shell - Interactive mode
+spool shell - Interactive mode
 
 Commands:
   add <title> [-d <description>] [-p <priority>] [-a <assignee>] [-t <tag>...]
@@ -51,12 +51,12 @@ Tab completion is available for commands and task IDs.
 Use Up/Down arrows to navigate command history.
 "#;
 
-struct FabricCompleter {
-    ctx: FabricContext,
+struct SpoolCompleter {
+    ctx: SpoolContext,
 }
 
-impl FabricCompleter {
-    fn new(ctx: FabricContext) -> Self {
+impl SpoolCompleter {
+    fn new(ctx: SpoolContext) -> Self {
         Self { ctx }
     }
 
@@ -67,7 +67,7 @@ impl FabricCompleter {
     }
 }
 
-impl Completer for FabricCompleter {
+impl Completer for SpoolCompleter {
     type Candidate = Pair;
 
     fn complete(
@@ -184,7 +184,7 @@ impl Completer for FabricCompleter {
     }
 }
 
-impl Hinter for FabricCompleter {
+impl Hinter for SpoolCompleter {
     type Hint = String;
 
     fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<String> {
@@ -192,15 +192,15 @@ impl Hinter for FabricCompleter {
     }
 }
 
-impl Highlighter for FabricCompleter {
+impl Highlighter for SpoolCompleter {
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
         Cow::Borrowed(hint)
     }
 }
 
-impl Validator for FabricCompleter {}
+impl Validator for SpoolCompleter {}
 
-impl Helper for FabricCompleter {}
+impl Helper for SpoolCompleter {}
 
 /// Split a command line respecting quoted strings
 fn shell_split(line: &str) -> Vec<String> {
@@ -417,7 +417,7 @@ fn parse_update_args(args: &[&str]) -> (Option<String>, Option<String>, Option<S
     (title, description, priority)
 }
 
-fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
+fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
     let parts = shell_split(line);
     if parts.is_empty() {
         return Ok(true); // Continue
@@ -511,19 +511,19 @@ fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
 }
 
 /// Run the interactive shell
-pub fn run_shell(ctx: FabricContext) -> Result<()> {
+pub fn run_shell(ctx: SpoolContext) -> Result<()> {
     let config = Config::builder()
         .history_ignore_space(true)
         .history_ignore_dups(true)?
         .build();
 
-    let completer = FabricCompleter::new(FabricContext::new(ctx.root.clone()));
-    let mut rl: Editor<FabricCompleter, DefaultHistory> = Editor::with_config(config)?;
+    let completer = SpoolCompleter::new(SpoolContext::new(ctx.root.clone()));
+    let mut rl: Editor<SpoolCompleter, DefaultHistory> = Editor::with_config(config)?;
     rl.set_helper(Some(completer));
 
     // Load history
     let history_path = dirs::data_local_dir()
-        .map(|p| p.join("fabric").join("shell_history"))
+        .map(|p| p.join("spool").join("shell_history"))
         .unwrap_or_else(|| ctx.root.join(".shell_history"));
 
     if let Some(parent) = history_path.parent() {
@@ -532,11 +532,11 @@ pub fn run_shell(ctx: FabricContext) -> Result<()> {
 
     let _ = rl.load_history(&history_path);
 
-    println!("fabric shell v0.1.0");
+    println!("spool shell v0.1.0");
     println!("Type 'help' for available commands, 'quit' to exit.\n");
 
     loop {
-        let readline = rl.readline("fabric> ");
+        let readline = rl.readline("spool> ");
 
         match readline {
             Ok(line) => {

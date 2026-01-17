@@ -1,5 +1,5 @@
 use chrono::Utc;
-use fabric::event::{Event, Operation};
+use spool::event::{Event, Operation};
 use serde_json::json;
 
 #[test]

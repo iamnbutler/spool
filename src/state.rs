@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -81,7 +81,7 @@ pub struct State {
     pub rebuilt: DateTime<Utc>,
 }
 
-pub fn materialize(ctx: &FabricContext) -> Result<State> {
+pub fn materialize(ctx: &SpoolContext) -> Result<State> {
     let mut tasks: HashMap<String, Task> = HashMap::new();
 
     // First process archive files
@@ -295,7 +295,7 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
 }
 
 #[allow(clippy::type_complexity)]
-pub fn build_index(ctx: &FabricContext) -> Result<Index> {
+pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
     let mut task_files: HashMap<String, HashSet<String>> = HashMap::new();
     let mut task_info: HashMap<
         String,
@@ -383,7 +383,7 @@ pub fn build_index(ctx: &FabricContext) -> Result<Index> {
     })
 }
 
-pub fn load_or_materialize_state(ctx: &FabricContext) -> Result<State> {
+pub fn load_or_materialize_state(ctx: &SpoolContext) -> Result<State> {
     let state_path = ctx.state_path();
     if state_path.exists() {
         let content = fs::read_to_string(&state_path)?;
@@ -394,7 +394,7 @@ pub fn load_or_materialize_state(ctx: &FabricContext) -> Result<State> {
     }
 }
 
-pub fn rebuild(ctx: &FabricContext) -> Result<()> {
+pub fn rebuild(ctx: &SpoolContext) -> Result<()> {
     println!("Rebuilding index and state...");
 
     let index = build_index(ctx)?;

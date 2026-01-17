@@ -1,21 +1,21 @@
-use fabric::context::FabricContext;
-use fabric::state::{Task, TaskStatus};
+use spool::context::SpoolContext;
+use spool::state::{Task, TaskStatus};
 use serde_json::json;
 use std::fs;
 use std::io::Write;
 use tempfile::TempDir;
 
-/// Helper to create a fabric directory structure for testing
-fn setup_fabric_dir(temp_dir: &TempDir) -> std::path::PathBuf {
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
-    fabric_dir
+/// Helper to create a spool directory structure for testing
+fn setup_spool_dir(temp_dir: &TempDir) -> std::path::PathBuf {
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
+    spool_dir
 }
 
-/// Create a FabricContext for testing
-fn create_test_context(fabric_dir: &std::path::Path) -> FabricContext {
-    FabricContext::new(fabric_dir.to_path_buf())
+/// Create a SpoolContext for testing
+fn create_test_context(spool_dir: &std::path::Path) -> SpoolContext {
+    SpoolContext::new(spool_dir.to_path_buf())
 }
 
 /// Write events to a file
@@ -102,7 +102,7 @@ fn test_task_serialization_skips_none_fields() {
 #[test]
 fn test_state_materialization_create_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     // Create a single create event
     let events = vec![json!({
@@ -121,10 +121,10 @@ fn test_state_materialization_create_event() {
         }
     })];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     assert_eq!(state.tasks.len(), 1);
     let task = state.tasks.get("task-001").unwrap();
@@ -140,7 +140,7 @@ fn test_state_materialization_create_event() {
 #[test]
 fn test_state_materialization_update_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -155,10 +155,10 @@ fn test_state_materialization_update_event() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-002").unwrap();
     assert_eq!(task.title, "Updated Title");
@@ -168,7 +168,7 @@ fn test_state_materialization_update_event() {
 #[test]
 fn test_state_materialization_complete_and_reopen() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -183,10 +183,10 @@ fn test_state_materialization_complete_and_reopen() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-003").unwrap();
     assert_eq!(task.status, TaskStatus::Complete);
@@ -197,7 +197,7 @@ fn test_state_materialization_complete_and_reopen() {
 #[test]
 fn test_state_materialization_assign_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -212,10 +212,10 @@ fn test_state_materialization_assign_event() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-004").unwrap();
     assert_eq!(task.assignee.as_deref(), Some("developer1"));
@@ -224,7 +224,7 @@ fn test_state_materialization_assign_event() {
 #[test]
 fn test_state_materialization_link_unlink() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -244,10 +244,10 @@ fn test_state_materialization_link_unlink() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-005").unwrap();
     assert!(task.blocks.contains(&"task-other".to_string()));
@@ -257,7 +257,7 @@ fn test_state_materialization_link_unlink() {
 #[test]
 fn test_state_materialization_comment() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -272,10 +272,10 @@ fn test_state_materialization_comment() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-006").unwrap();
     assert_eq!(task.comments.len(), 1);
@@ -287,7 +287,7 @@ fn test_state_materialization_comment() {
 #[test]
 fn test_state_materialization_multiple_files() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     // Events across multiple days
     let day1_events = vec![json!({
@@ -302,11 +302,11 @@ fn test_state_materialization_multiple_files() {
         "d": {"title": "Day 2 Task"}
     })];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &day1_events);
-    write_events(&fabric_dir.join("events"), "2024-01-16.jsonl", &day2_events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &day1_events);
+    write_events(&spool_dir.join("events"), "2024-01-16.jsonl", &day2_events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     assert_eq!(state.tasks.len(), 2);
     assert!(state.tasks.contains_key("task-007"));
@@ -316,7 +316,7 @@ fn test_state_materialization_multiple_files() {
 #[test]
 fn test_state_rebuild() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -331,17 +331,17 @@ fn test_state_rebuild() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    fabric::state::rebuild(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    spool::state::rebuild(&ctx).unwrap();
 
     // Verify index and state files were created
     assert!(ctx.index_path().exists());
     assert!(ctx.state_path().exists());
 
     // Verify state can be loaded
-    let state = fabric::state::load_or_materialize_state(&ctx).unwrap();
+    let state = spool::state::load_or_materialize_state(&ctx).unwrap();
     assert_eq!(state.tasks.len(), 1);
     assert_eq!(
         state.tasks.get("task-rebuild").unwrap().status,
@@ -352,7 +352,7 @@ fn test_state_rebuild() {
 #[test]
 fn test_state_materialization_reopen() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -372,10 +372,10 @@ fn test_state_materialization_reopen() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-reopen").unwrap();
     assert_eq!(task.status, TaskStatus::Open);
@@ -386,7 +386,7 @@ fn test_state_materialization_reopen() {
 #[test]
 fn test_state_materialization_unlink() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -401,10 +401,10 @@ fn test_state_materialization_unlink() {
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-unlink").unwrap();
     assert!(!task.blocks.contains(&"other-task".to_string()));
@@ -413,7 +413,7 @@ fn test_state_materialization_unlink() {
 #[test]
 fn test_state_materialization_archive() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
     let events = vec![
         json!({
@@ -423,15 +423,15 @@ fn test_state_materialization_archive() {
         }),
         json!({
             "v": 1, "op": "archive", "id": "task-archive",
-            "ts": "2024-01-15T11:00:00Z", "by": "@fabric", "branch": "main",
+            "ts": "2024-01-15T11:00:00Z", "by": "@spool", "branch": "main",
             "d": {"ref": "2024-01"}
         }),
     ];
 
-    write_events(&fabric_dir.join("events"), "2024-01-15.jsonl", &events);
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
 
-    let ctx = create_test_context(&fabric_dir);
-    let state = fabric::state::materialize(&ctx).unwrap();
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
 
     let task = state.tasks.get("task-archive").unwrap();
     assert_eq!(task.archived.as_deref(), Some("2024-01"));

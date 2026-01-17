@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 
 use crate::event::Event;
 
-pub struct FabricContext {
+pub struct SpoolContext {
     pub root: PathBuf,
     pub events_dir: PathBuf,
     pub archive_dir: PathBuf,
 }
 
-impl FabricContext {
-    /// Create a new FabricContext with the given root directory
+impl SpoolContext {
+    /// Create a new SpoolContext with the given root directory
     pub fn new(root: PathBuf) -> Self {
         Self {
             events_dir: root.join("events"),
@@ -24,13 +24,13 @@ impl FabricContext {
     pub fn discover() -> Result<Self> {
         let mut current = std::env::current_dir()?;
         loop {
-            let fabric_dir = current.join(".fabric");
-            if fabric_dir.is_dir() {
-                return Ok(Self::new(fabric_dir));
+            let spool_dir = current.join(".spool");
+            if spool_dir.is_dir() {
+                return Ok(Self::new(spool_dir));
             }
             if !current.pop() {
                 return Err(anyhow!(
-                    "Not in a fabric directory. Run 'fabric init' to create one."
+                    "Not in a spool directory. Run 'spool init' to create one."
                 ));
             }
         }
@@ -92,14 +92,14 @@ impl FabricContext {
 }
 
 pub fn init() -> Result<()> {
-    let fabric_dir = PathBuf::from(".fabric");
+    let spool_dir = PathBuf::from(".spool");
 
-    if fabric_dir.exists() {
-        return Err(anyhow!(".fabric directory already exists"));
+    if spool_dir.exists() {
+        return Err(anyhow!(".spool directory already exists"));
     }
 
-    fs::create_dir_all(fabric_dir.join("events"))?;
-    fs::create_dir_all(fabric_dir.join("archive"))?;
+    fs::create_dir_all(spool_dir.join("events"))?;
+    fs::create_dir_all(spool_dir.join("archive"))?;
 
     let gitignore = r#"# Derived files - rebuilt from events on checkout/merge
 # These are caches for fast queries, not source of truth
@@ -114,12 +114,12 @@ pub fn init() -> Result<()> {
 *.tmp
 *.bak
 "#;
-    fs::write(fabric_dir.join(".gitignore"), gitignore)?;
+    fs::write(spool_dir.join(".gitignore"), gitignore)?;
 
-    println!("Created .fabric/");
-    println!("  .fabric/events/     - Daily event logs");
-    println!("  .fabric/archive/    - Monthly rollups");
-    println!("  .fabric/.gitignore  - Ignores derived files");
+    println!("Created .spool/");
+    println!("  .spool/events/     - Daily event logs");
+    println!("  .spool/archive/    - Monthly rollups");
+    println!("  .spool/.gitignore  - Ignores derived files");
 
     Ok(())
 }

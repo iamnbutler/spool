@@ -15,13 +15,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            binary: fabric
+            binary: spool
           - os: macos-latest
             target: x86_64-apple-darwin
-            binary: fabric
+            binary: spool
           - os: macos-latest
             target: aarch64-apple-darwin
-            binary: fabric
+            binary: spool
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
       - name: Package
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          ARCHIVE="fabric-${VERSION}-${{ matrix.target }}"
+          ARCHIVE="spool-${VERSION}-${{ matrix.target }}"
           mkdir -p dist
           cp target/${{ matrix.target }}/release/${{ matrix.binary }} dist/
           cd dist
@@ -48,7 +48,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fabric-${{ matrix.target }}
+          name: spool-${{ matrix.target }}
           path: dist/*.tar.gz*
 
   create-release:

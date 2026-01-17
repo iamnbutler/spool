@@ -1,6 +1,6 @@
-# Contributing to Fabric
+# Contributing to Spool
 
-Thank you for your interest in contributing to Fabric!
+Thank you for your interest in contributing to Spool!
 
 ## Development Setup
 
@@ -11,8 +11,8 @@ Thank you for your interest in contributing to Fabric!
 
 2. **Clone and build**
    ```bash
-   git clone https://github.com/your-username/fabric.git
-   cd fabric
+   git clone https://github.com/your-username/spool.git
+   cd spool
    cargo build
    ```
 

@@ -1,31 +1,31 @@
-# Getting Started with Fabric
+# Getting Started with Spool
 
-Fabric is a git-native task management system. Tasks are stored as events in your repository, giving you full history and branch-aware workflows.
+Spool is a git-native task management system. Tasks are stored as events in your repository, giving you full history and branch-aware workflows.
 
 ## Installation
 
 ```bash
-cargo install fabric
+cargo install spool
 ```
 
 Or build from source:
 ```bash
-git clone https://github.com/your-username/fabric.git
-cd fabric
+git clone https://github.com/your-username/spool.git
+cd spool
 cargo install --path .
 ```
 
 ## Quick Start
 
-### 1. Initialize Fabric
+### 1. Initialize Spool
 
 In your project directory:
 
 ```bash
-fabric init
+spool init
 ```
 
-This creates `.fabric/` with:
+This creates `.spool/` with:
 - `events/` - Daily event logs (committed to git)
 - `archive/` - Monthly rollups of completed tasks
 - `.gitignore` - Ignores derived cache files
@@ -33,7 +33,7 @@ This creates `.fabric/` with:
 ### 2. Create a Task
 
 ```bash
-fabric add "Implement user authentication" -p p1 -t feature
+spool add "Implement user authentication" -p p1 -t feature
 ```
 
 Options:
@@ -46,54 +46,54 @@ Options:
 
 ```bash
 # List open tasks (default)
-fabric list
+spool list
 
 # List all tasks
-fabric list --status all
+spool list --status all
 
 # Filter by assignee
-fabric list --assignee @alice
+spool list --assignee @alice
 
 # Output as JSON
-fabric list --format json
+spool list --format json
 ```
 
 ### 4. View Task Details
 
 ```bash
-fabric show task-abc123
+spool show task-abc123
 
 # Include event history
-fabric show task-abc123 --events
+spool show task-abc123 --events
 ```
 
 ### 5. Update Tasks
 
 ```bash
 # Update title
-fabric update task-abc123 --title "New title"
+spool update task-abc123 --title "New title"
 
 # Update priority
-fabric update task-abc123 --priority p0
+spool update task-abc123 --priority p0
 
 # Assign to yourself
-fabric claim task-abc123
+spool claim task-abc123
 
 # Assign to someone else
-fabric assign task-abc123 @bob
+spool assign task-abc123 @bob
 
 # Unassign
-fabric free task-abc123
+spool free task-abc123
 ```
 
 ### 6. Complete Tasks
 
 ```bash
 # Mark as done
-fabric complete task-abc123
+spool complete task-abc123
 
 # With resolution
-fabric complete task-abc123 --resolution wontfix
+spool complete task-abc123 --resolution wontfix
 ```
 
 Resolutions: `done`, `wontfix`, `duplicate`, `obsolete`
@@ -103,10 +103,10 @@ Resolutions: `done`, `wontfix`, `duplicate`, `obsolete`
 For rapid task management:
 
 ```bash
-fabric shell
+spool shell
 ```
 
-Commands work the same but without the `fabric` prefix:
+Commands work the same but without the `spool` prefix:
 ```
 > add "Quick task" -p p2
 > list
@@ -116,10 +116,10 @@ Commands work the same but without the `fabric` prefix:
 
 ## Git Integration
 
-Fabric events are regular files - commit them with your code:
+Spool events are regular files - commit them with your code:
 
 ```bash
-git add .fabric/events/
+git add .spool/events/
 git commit -m "Add authentication task"
 ```
 
@@ -128,4 +128,4 @@ Tasks follow branches. When you merge, events merge cleanly (append-only JSONL).
 ## Next Steps
 
 - See [CLI Guide](CLI_GUIDE.md) for complete command reference
-- Run `fabric --help` for all options
+- Run `spool --help` for all options

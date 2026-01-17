@@ -3,20 +3,20 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, Write};
 use tempfile::TempDir;
 
-use fabric::context::FabricContext;
-use fabric::event::{Event, Operation};
-use fabric::state::{build_index, materialize, Task, TaskStatus};
+use spool::context::SpoolContext;
+use spool::event::{Event, Operation};
+use spool::state::{build_index, materialize, Task, TaskStatus};
 
-fn create_test_fabric(num_tasks: usize) -> (TempDir, FabricContext) {
+fn create_test_spool(num_tasks: usize) -> (TempDir, SpoolContext) {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
 
-    let ctx = FabricContext {
-        root: fabric_dir.clone(),
-        events_dir: fabric_dir.join("events"),
-        archive_dir: fabric_dir.join("archive"),
+    let ctx = SpoolContext {
+        root: spool_dir.clone(),
+        events_dir: spool_dir.join("events"),
+        archive_dir: spool_dir.join("archive"),
     };
 
     // Generate test events
@@ -143,7 +143,7 @@ fn bench_state_materialization(c: &mut Criterion) {
     let mut group = c.benchmark_group("materialization");
 
     for size in [100, 500, 1000, 5000].iter() {
-        let (_temp_dir, ctx) = create_test_fabric(*size);
+        let (_temp_dir, ctx) = create_test_spool(*size);
 
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::new("materialize", size), size, |b, _| {
@@ -158,7 +158,7 @@ fn bench_index_building(c: &mut Criterion) {
     let mut group = c.benchmark_group("indexing");
 
     for size in [100, 500, 1000, 5000].iter() {
-        let (_temp_dir, ctx) = create_test_fabric(*size);
+        let (_temp_dir, ctx) = create_test_spool(*size);
 
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::new("build_index", size), size, |b, _| {
@@ -172,7 +172,7 @@ fn bench_index_building(c: &mut Criterion) {
 fn bench_queries(c: &mut Criterion) {
     let mut group = c.benchmark_group("queries");
 
-    let (_temp_dir, ctx) = create_test_fabric(1000);
+    let (_temp_dir, ctx) = create_test_spool(1000);
     let state = materialize(&ctx).unwrap();
 
     group.bench_function("filter_by_status_open", |b| {
@@ -234,7 +234,7 @@ fn bench_event_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("parsing");
 
     for size in [100, 500, 1000].iter() {
-        let (_temp_dir, ctx) = create_test_fabric(*size);
+        let (_temp_dir, ctx) = create_test_spool(*size);
         let files = ctx.get_event_files().unwrap();
         let file = &files[0];
 

@@ -6,7 +6,7 @@ use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 
 /// Global sequence counter for optimistic locking
@@ -45,7 +45,7 @@ pub struct FileLock {
 
 impl FileLock {
     /// Acquire an advisory lock on the events directory
-    pub fn acquire(ctx: &FabricContext) -> Result<Self> {
+    pub fn acquire(ctx: &SpoolContext) -> Result<Self> {
         let path = ctx.root.join(".lock");
 
         // Try to create lock file exclusively
@@ -88,7 +88,7 @@ impl Drop for FileLock {
 }
 
 /// Get the current version of a task by reading its last event
-pub fn get_task_version(ctx: &FabricContext, task_id: &str) -> Result<Option<Version>> {
+pub fn get_task_version(ctx: &SpoolContext, task_id: &str) -> Result<Option<Version>> {
     let mut last_event: Option<Event> = None;
 
     // Scan event files in reverse chronological order
@@ -124,7 +124,7 @@ pub fn get_task_version(ctx: &FabricContext, task_id: &str) -> Result<Option<Ver
 
 /// Write an event with optimistic locking
 pub fn write_event_with_version(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     event: &Event,
     expected_version: Option<&Version>,
 ) -> Result<WriteResult> {
@@ -185,12 +185,12 @@ pub fn write_event_with_version(
 
 /// Retry a write operation with exponential backoff
 pub fn write_with_retry<F>(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     max_retries: u32,
     mut operation: F,
 ) -> Result<WriteResult>
 where
-    F: FnMut(&FabricContext) -> Result<(Event, Option<Version>)>,
+    F: FnMut(&SpoolContext) -> Result<(Event, Option<Version>)>,
 {
     let mut retries = 0;
     let mut delay_ms = 10;
@@ -226,16 +226,16 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    fn setup_test_ctx() -> (TempDir, FabricContext) {
+    fn setup_test_ctx() -> (TempDir, SpoolContext) {
         let temp_dir = TempDir::new().unwrap();
-        let fabric_dir = temp_dir.path().join(".fabric");
-        fs::create_dir_all(fabric_dir.join("events")).unwrap();
-        fs::create_dir_all(fabric_dir.join("archive")).unwrap();
+        let spool_dir = temp_dir.path().join(".spool");
+        fs::create_dir_all(spool_dir.join("events")).unwrap();
+        fs::create_dir_all(spool_dir.join("archive")).unwrap();
 
-        let ctx = FabricContext {
-            root: fabric_dir.clone(),
-            events_dir: fabric_dir.join("events"),
-            archive_dir: fabric_dir.join("archive"),
+        let ctx = SpoolContext {
+            root: spool_dir.clone(),
+            events_dir: spool_dir.join("events"),
+            archive_dir: spool_dir.join("archive"),
         };
 
         (temp_dir, ctx)

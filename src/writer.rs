@@ -3,12 +3,12 @@ use chrono::Utc;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 use crate::id::generate_id;
 
 /// Write an event to the current day's event file
-pub fn write_event(ctx: &FabricContext, event: &Event) -> Result<()> {
+pub fn write_event(ctx: &SpoolContext, event: &Event) -> Result<()> {
     let today = Utc::now().format("%Y-%m-%d").to_string();
     let event_file = ctx.events_dir.join(format!("{}.jsonl", today));
 
@@ -28,7 +28,7 @@ pub fn write_event(ctx: &FabricContext, event: &Event) -> Result<()> {
 /// Create a new task and return its ID
 #[allow(clippy::too_many_arguments)]
 pub fn create_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     title: &str,
     description: Option<&str>,
     priority: Option<&str>,
@@ -87,7 +87,7 @@ pub fn get_current_branch() -> Result<String> {
 
 /// Update a task's fields
 pub fn update_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     id: &str,
     title: Option<&str>,
     description: Option<&str>,
@@ -135,7 +135,7 @@ pub fn update_task(
 
 /// Complete a task
 pub fn complete_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     id: &str,
     resolution: Option<&str>,
     by: &str,
@@ -157,7 +157,7 @@ pub fn complete_task(
 }
 
 /// Reopen a completed task
-pub fn reopen_task(ctx: &FabricContext, id: &str, by: &str, branch: &str) -> Result<()> {
+pub fn reopen_task(ctx: &SpoolContext, id: &str, by: &str, branch: &str) -> Result<()> {
     let event = Event {
         v: 1,
         op: Operation::Reopen,
@@ -173,7 +173,7 @@ pub fn reopen_task(ctx: &FabricContext, id: &str, by: &str, branch: &str) -> Res
 
 /// Assign a task to a user
 pub fn assign_task(
-    ctx: &FabricContext,
+    ctx: &SpoolContext,
     id: &str,
     assignee: Option<&str>,
     by: &str,

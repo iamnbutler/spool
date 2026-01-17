@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to Fabric will be documented in this file.
+All notable changes to Spool will be documented in this file.
 
 ## [0.1.0] - 2026-01-13
 
 ### Added
 
-Initial release of Fabric, a git-native task management system.
+Initial release of Spool, a git-native task management system.
 
 #### Core Features
 
@@ -16,12 +16,12 @@ Initial release of Fabric, a git-native task management system.
 
 #### Commands
 
-- `fabric init` - Initialize `.fabric/` directory structure in a repository
-- `fabric list` - List tasks with filtering by status, assignee, tag, or priority
-- `fabric show` - Display detailed task information with optional event history
-- `fabric rebuild` - Regenerate index and state caches from event logs
-- `fabric archive` - Move completed tasks to monthly archive files
-- `fabric validate` - Check event files for correctness and consistency
+- `spool init` - Initialize `.spool/` directory structure in a repository
+- `spool list` - List tasks with filtering by status, assignee, tag, or priority
+- `spool show` - Display detailed task information with optional event history
+- `spool rebuild` - Regenerate index and state caches from event logs
+- `spool archive` - Move completed tasks to monthly archive files
+- `spool validate` - Check event files for correctness and consistency
 
 #### Task Operations Supported
 

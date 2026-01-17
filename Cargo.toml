@@ -1,5 +1,5 @@
 [package]
-name = "fabric"
+name = "spool"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.70"
@@ -28,5 +28,5 @@ assert_cmd = "2.0"
 predicates = "3.0"
 
 [[bench]]
-name = "fabric_benchmarks"
+name = "spool_benchmarks"
 harness = false

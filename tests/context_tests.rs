@@ -2,50 +2,50 @@ use std::fs;
 use std::io::Write;
 use tempfile::TempDir;
 
-use fabric::context::FabricContext;
+use spool::context::SpoolContext;
 
-fn setup_fabric_dir(temp_dir: &TempDir) -> std::path::PathBuf {
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
-    fabric_dir
+fn setup_spool_dir(temp_dir: &TempDir) -> std::path::PathBuf {
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
+    spool_dir
 }
 
 #[test]
-fn test_fabric_context_new() {
+fn test_spool_context_new() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
 
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    assert_eq!(ctx.root, fabric_dir);
-    assert_eq!(ctx.events_dir, fabric_dir.join("events"));
-    assert_eq!(ctx.archive_dir, fabric_dir.join("archive"));
+    assert_eq!(ctx.root, spool_dir);
+    assert_eq!(ctx.events_dir, spool_dir.join("events"));
+    assert_eq!(ctx.archive_dir, spool_dir.join("archive"));
 }
 
 #[test]
-fn test_fabric_context_index_path() {
+fn test_spool_context_index_path() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    assert_eq!(ctx.index_path(), fabric_dir.join(".index.json"));
+    assert_eq!(ctx.index_path(), spool_dir.join(".index.json"));
 }
 
 #[test]
-fn test_fabric_context_state_path() {
+fn test_spool_context_state_path() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    assert_eq!(ctx.state_path(), fabric_dir.join(".state.json"));
+    assert_eq!(ctx.state_path(), spool_dir.join(".state.json"));
 }
 
 #[test]
 fn test_get_event_files_empty() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir);
 
     let files = ctx.get_event_files().unwrap();
     assert!(files.is_empty());
@@ -54,11 +54,11 @@ fn test_get_event_files_empty() {
 #[test]
 fn test_get_event_files_single() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
     // Create a single event file
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     fs::write(&event_file, "{}").unwrap();
 
     let files = ctx.get_event_files().unwrap();
@@ -69,11 +69,11 @@ fn test_get_event_files_single() {
 #[test]
 fn test_get_event_files_sorted() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
     // Create files in non-sorted order
-    let events_dir = fabric_dir.join("events");
+    let events_dir = spool_dir.join("events");
     fs::write(events_dir.join("2024-01-17.jsonl"), "{}").unwrap();
     fs::write(events_dir.join("2024-01-15.jsonl"), "{}").unwrap();
     fs::write(events_dir.join("2024-01-16.jsonl"), "{}").unwrap();
@@ -90,10 +90,10 @@ fn test_get_event_files_sorted() {
 #[test]
 fn test_get_event_files_ignores_non_jsonl() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let events_dir = fabric_dir.join("events");
+    let events_dir = spool_dir.join("events");
     fs::write(events_dir.join("2024-01-15.jsonl"), "{}").unwrap();
     fs::write(events_dir.join("2024-01-15.txt"), "{}").unwrap();
     fs::write(events_dir.join("2024-01-15.json"), "{}").unwrap();
@@ -107,8 +107,8 @@ fn test_get_event_files_ignores_non_jsonl() {
 #[test]
 fn test_get_archive_files_empty() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir);
 
     let files = ctx.get_archive_files().unwrap();
     assert!(files.is_empty());
@@ -117,10 +117,10 @@ fn test_get_archive_files_empty() {
 #[test]
 fn test_get_archive_files_sorted() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let archive_dir = fabric_dir.join("archive");
+    let archive_dir = spool_dir.join("archive");
     fs::write(archive_dir.join("2024-03.jsonl"), "{}").unwrap();
     fs::write(archive_dir.join("2024-01.jsonl"), "{}").unwrap();
     fs::write(archive_dir.join("2024-02.jsonl"), "{}").unwrap();
@@ -137,10 +137,10 @@ fn test_get_archive_files_sorted() {
 #[test]
 fn test_parse_events_from_file_single_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     let event_json = r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test"}}"#;
     fs::write(&event_file, event_json).unwrap();
 
@@ -152,10 +152,10 @@ fn test_parse_events_from_file_single_event() {
 #[test]
 fn test_parse_events_from_file_multiple_events() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     let mut file = fs::File::create(&event_file).unwrap();
     writeln!(file, r#"{{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{{"title":"First"}}}}"#).unwrap();
     writeln!(file, r#"{{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{{"title":"Second"}}}}"#).unwrap();
@@ -171,10 +171,10 @@ fn test_parse_events_from_file_multiple_events() {
 #[test]
 fn test_parse_events_from_file_skips_empty_lines() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     let mut file = fs::File::create(&event_file).unwrap();
     writeln!(file, r#"{{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{{"title":"First"}}}}"#).unwrap();
     writeln!(file, "").unwrap(); // Empty line
@@ -188,10 +188,10 @@ fn test_parse_events_from_file_skips_empty_lines() {
 #[test]
 fn test_parse_events_from_file_invalid_json_errors() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     fs::write(&event_file, "not valid json").unwrap();
 
     let result = ctx.parse_events_from_file(&event_file);
@@ -201,10 +201,10 @@ fn test_parse_events_from_file_invalid_json_errors() {
 #[test]
 fn test_parse_events_from_file_missing_field_errors() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("2024-01-15.jsonl");
+    let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     // Missing required 'id' field
     fs::write(&event_file, r#"{"v":1,"op":"create","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{}}"#).unwrap();
 
@@ -215,10 +215,10 @@ fn test_parse_events_from_file_missing_field_errors() {
 #[test]
 fn test_parse_events_from_file_nonexistent_errors() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = FabricContext::new(fabric_dir.clone());
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = SpoolContext::new(spool_dir.clone());
 
-    let event_file = fabric_dir.join("events").join("nonexistent.jsonl");
+    let event_file = spool_dir.join("events").join("nonexistent.jsonl");
 
     let result = ctx.parse_events_from_file(&event_file);
     assert!(result.is_err());
@@ -232,23 +232,23 @@ fn test_parse_events_from_file_nonexistent_errors() {
 fn test_init_directory_structure() {
     // Verify the expected structure that init() would create
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = temp_dir.path().join(".fabric");
+    let spool_dir = temp_dir.path().join(".spool");
 
     // Simulate init structure
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
 
     let gitignore_content = ".index.json\n.state.json\n";
-    fs::write(fabric_dir.join(".gitignore"), gitignore_content).unwrap();
+    fs::write(spool_dir.join(".gitignore"), gitignore_content).unwrap();
 
     // Verify structure
-    assert!(fabric_dir.is_dir());
-    assert!(fabric_dir.join("events").is_dir());
-    assert!(fabric_dir.join("archive").is_dir());
-    assert!(fabric_dir.join(".gitignore").is_file());
+    assert!(spool_dir.is_dir());
+    assert!(spool_dir.join("events").is_dir());
+    assert!(spool_dir.join("archive").is_dir());
+    assert!(spool_dir.join(".gitignore").is_file());
 
     // Verify gitignore content
-    let gitignore = fs::read_to_string(fabric_dir.join(".gitignore")).unwrap();
+    let gitignore = fs::read_to_string(spool_dir.join(".gitignore")).unwrap();
     assert!(gitignore.contains(".index.json"));
     assert!(gitignore.contains(".state.json"));
 }
@@ -256,11 +256,11 @@ fn test_init_directory_structure() {
 #[test]
 fn test_get_event_files_no_events_dir() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(&fabric_dir).unwrap();
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(&spool_dir).unwrap();
     // Don't create events dir
 
-    let ctx = FabricContext::new(fabric_dir);
+    let ctx = SpoolContext::new(spool_dir);
     let files = ctx.get_event_files().unwrap();
     assert!(files.is_empty());
 }
@@ -268,11 +268,11 @@ fn test_get_event_files_no_events_dir() {
 #[test]
 fn test_get_archive_files_no_archive_dir() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(&fabric_dir).unwrap();
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(&spool_dir).unwrap();
     // Don't create archive dir
 
-    let ctx = FabricContext::new(fabric_dir);
+    let ctx = SpoolContext::new(spool_dir);
     let files = ctx.get_archive_files().unwrap();
     assert!(files.is_empty());
 }

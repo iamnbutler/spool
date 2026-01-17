@@ -4,11 +4,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, Write};
 
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 use crate::state::{materialize, Task, TaskStatus};
 
-pub fn archive_tasks(ctx: &FabricContext, days: u32, dry_run: bool) -> Result<Vec<String>> {
+pub fn archive_tasks(ctx: &SpoolContext, days: u32, dry_run: bool) -> Result<Vec<String>> {
     let state = materialize(ctx)?;
     let cutoff = Utc::now() - chrono::Duration::days(days as i64);
 
@@ -92,7 +92,7 @@ pub fn archive_tasks(ctx: &FabricContext, days: u32, dry_run: bool) -> Result<Ve
                 op: Operation::Archive,
                 id: task.id.clone(),
                 ts: Utc::now(),
-                by: "@fabric".to_string(),
+                by: "@spool".to_string(),
                 branch: branch.clone(),
                 d: serde_json::json!({ "ref": month }),
             };
@@ -110,7 +110,7 @@ pub fn archive_tasks(ctx: &FabricContext, days: u32, dry_run: bool) -> Result<Ve
     Ok(archived_ids)
 }
 
-pub fn collect_all_events(ctx: &FabricContext) -> Result<HashMap<String, Vec<Event>>> {
+pub fn collect_all_events(ctx: &SpoolContext) -> Result<HashMap<String, Vec<Event>>> {
     let mut events_by_task: HashMap<String, Vec<Event>> = HashMap::new();
 
     for file in ctx.get_event_files()? {

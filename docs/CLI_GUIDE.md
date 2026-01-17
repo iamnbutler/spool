@@ -1,6 +1,6 @@
-# Fabric CLI User Guide
+# Spool CLI User Guide
 
-Fabric is a git-native task management system that stores all task data as append-only event logs in your repository. Tasks are tracked through events, enabling full history, branch-aware workflows, and seamless git integration.
+Spool is a git-native task management system that stores all task data as append-only event logs in your repository. Tasks are tracked through events, enabling full history, branch-aware workflows, and seamless git integration.
 
 ## Table of Contents
 
@@ -14,30 +14,30 @@ Fabric is a git-native task management system that stores all task data as appen
 ## Quick Start
 
 ```bash
-# Initialize fabric in your repository
-fabric init
+# Initialize spool in your repository
+spool init
 
 # List open tasks
-fabric list
+spool list
 
 # Show task details
-fabric show <task-id>
+spool show <task-id>
 
 # Validate event files
-fabric validate
+spool validate
 
 # Rebuild index and state from events
-fabric rebuild
+spool rebuild
 
 # Archive old completed tasks
-fabric archive --days 30
+spool archive --days 30
 ```
 
 ## Core Concepts
 
 ### Event Sourcing
 
-Fabric uses event sourcing as its core architecture. Instead of storing mutable task records, every change is recorded as an immutable event. This provides:
+Spool uses event sourcing as its core architecture. Instead of storing mutable task records, every change is recorded as an immutable event. This provides:
 
 - **Full history**: See how any task evolved over time
 - **Branch-aware**: Events include branch information for merge conflict resolution
@@ -46,10 +46,10 @@ Fabric uses event sourcing as its core architecture. Instead of storing mutable 
 
 ### Directory Structure
 
-After running `fabric init`, your repository will contain:
+After running `spool init`, your repository will contain:
 
 ```
-.fabric/
+.spool/
 ├── events/           # Daily event logs (YYYY-MM-DD.jsonl)
 ├── archive/          # Monthly rollups of completed tasks
 ├── .index.json       # Task index cache (gitignored)
@@ -77,27 +77,27 @@ Create → Open → Complete → Archive
 
 ## Commands
 
-### `fabric init`
+### `spool init`
 
-Initialize the `.fabric/` directory structure in the current repository.
+Initialize the `.spool/` directory structure in the current repository.
 
 ```bash
-fabric init
+spool init
 ```
 
 Creates:
-- `.fabric/events/` - Directory for daily event logs
-- `.fabric/archive/` - Directory for monthly archives
-- `.fabric/.gitignore` - Ignores derived cache files
+- `.spool/events/` - Directory for daily event logs
+- `.spool/archive/` - Directory for monthly archives
+- `.spool/.gitignore` - Ignores derived cache files
 
 **Note:** Run this once at the root of your repository.
 
-### `fabric list`
+### `spool list`
 
 List tasks with optional filtering.
 
 ```bash
-fabric list [OPTIONS]
+spool list [OPTIONS]
 ```
 
 **Options:**
@@ -113,27 +113,27 @@ fabric list [OPTIONS]
 
 ```bash
 # List all open tasks (default)
-fabric list
+spool list
 
 # List completed tasks
-fabric list --status complete
+spool list --status complete
 
 # List tasks assigned to @alice
-fabric list --assignee @alice
+spool list --assignee @alice
 
 # List high-priority tasks as JSON
-fabric list --priority high --format json
+spool list --priority high --format json
 
 # Get just task IDs for scripting
-fabric list --format ids
+spool list --format ids
 ```
 
-### `fabric show`
+### `spool show`
 
 Display detailed information about a specific task.
 
 ```bash
-fabric show <task-id> [OPTIONS]
+spool show <task-id> [OPTIONS]
 ```
 
 **Options:**
@@ -155,22 +155,22 @@ fabric show <task-id> [OPTIONS]
 
 ```bash
 # Show task details
-fabric show k8b2x-a1c3
+spool show k8b2x-a1c3
 
 # Show task with full event history
-fabric show k8b2x-a1c3 --events
+spool show k8b2x-a1c3 --events
 ```
 
-### `fabric rebuild`
+### `spool rebuild`
 
 Rebuild the `.index.json` and `.state.json` cache files from event logs.
 
 ```bash
-fabric rebuild
+spool rebuild
 ```
 
 **When to use:**
-- After cloning a repository with fabric
+- After cloning a repository with spool
 - After pulling changes that include new events
 - If cache files become corrupted
 - After resolving merge conflicts in event files
@@ -179,15 +179,15 @@ fabric rebuild
 ```bash
 # .git/hooks/post-merge
 #!/bin/sh
-fabric rebuild
+spool rebuild
 ```
 
-### `fabric archive`
+### `spool archive`
 
 Archive completed tasks older than a specified number of days.
 
 ```bash
-fabric archive [OPTIONS]
+spool archive [OPTIONS]
 ```
 
 **Options:**
@@ -206,21 +206,21 @@ fabric archive [OPTIONS]
 
 ```bash
 # Preview tasks that would be archived
-fabric archive --dry-run
+spool archive --dry-run
 
 # Archive tasks completed more than 30 days ago
-fabric archive
+spool archive
 
 # Archive tasks completed more than 7 days ago
-fabric archive --days 7
+spool archive --days 7
 ```
 
-### `fabric validate`
+### `spool validate`
 
 Validate event files for correctness and consistency.
 
 ```bash
-fabric validate [OPTIONS]
+spool validate [OPTIONS]
 ```
 
 **Options:**
@@ -244,10 +244,10 @@ fabric validate [OPTIONS]
 
 ```bash
 # Basic validation
-fabric validate
+spool validate
 
 # Strict validation (fails on warnings)
-fabric validate --strict
+spool validate --strict
 ```
 
 ## Event Schema
@@ -309,7 +309,7 @@ Example: `k8b2x-a1c3`
 When a task relates to code changes, commit the task events in the same commit:
 
 ```bash
-git add src/feature.rs .fabric/events/
+git add src/feature.rs .spool/events/
 git commit -m "Implement feature X and update task status"
 ```
 
@@ -318,7 +318,7 @@ git commit -m "Implement feature X and update task status"
 ```bash
 #!/bin/sh
 # .git/hooks/post-merge
-fabric rebuild
+spool rebuild
 ```
 
 **3. Use post-checkout hooks for branch switching**
@@ -326,7 +326,7 @@ fabric rebuild
 ```bash
 #!/bin/sh
 # .git/hooks/post-checkout
-fabric rebuild
+spool rebuild
 ```
 
 **4. Handle merge conflicts in event files**
@@ -334,17 +334,17 @@ fabric rebuild
 Event files are append-only, so conflicts are typically resolved by keeping both sets of events:
 
 ```bash
-# When conflict occurs in .fabric/events/2026-01-13.jsonl:
+# When conflict occurs in .spool/events/2026-01-13.jsonl:
 # Keep both the incoming and local changes, then rebuild
-git checkout --theirs .fabric/events/2026-01-13.jsonl
+git checkout --theirs .spool/events/2026-01-13.jsonl
 # Or manually merge by keeping all events from both versions
-fabric validate
-fabric rebuild
+spool validate
+spool rebuild
 ```
 
 ### Branch-Aware Workflows
 
-Since events include branch information, fabric supports workflows like:
+Since events include branch information, spool supports workflows like:
 
 - **Feature branches**: Create tasks on feature branches, see branch context
 - **Code review**: Comments include branch/commit context
@@ -356,24 +356,24 @@ Since events include branch information, fabric supports workflows like:
 
 ```bash
 # See what's assigned to you
-fabric list --assignee @$(whoami)
+spool list --assignee @$(whoami)
 
 # See all open tasks
-fabric list
+spool list
 
 # Check task details
-fabric show <task-id>
+spool show <task-id>
 ```
 
 ### Starting Work
 
 ```bash
 # Find available work
-fabric list --status open
+spool list --status open
 
 # (Tasks would be assigned via event creation)
 # View task details before starting
-fabric show <task-id>
+spool show <task-id>
 ```
 
 ### Completing Work
@@ -381,52 +381,52 @@ fabric show <task-id>
 ```bash
 # (Complete event would be created)
 # View the completed task
-fabric show <task-id>
+spool show <task-id>
 ```
 
 ### Maintenance
 
 ```bash
 # Validate event files periodically
-fabric validate
+spool validate
 
 # Archive old completed tasks monthly
-fabric archive --days 30
+spool archive --days 30
 
 # After pulling changes, rebuild state
-fabric rebuild
+spool rebuild
 ```
 
 ### Scripting Integration
 
 ```bash
 # Get task IDs for scripting
-TASKS=$(fabric list --format ids)
+TASKS=$(spool list --format ids)
 
 # Output as JSON for processing
-fabric list --format json | jq '.[] | select(.priority == "high")'
+spool list --format json | jq '.[] | select(.priority == "high")'
 
 # Check validation in CI
-fabric validate --strict || exit 1
+spool validate --strict || exit 1
 ```
 
 ## Troubleshooting
 
-### "Not in a fabric directory"
+### "Not in a spool directory"
 
-Run `fabric init` in your repository root, or navigate to a directory that contains `.fabric/`.
+Run `spool init` in your repository root, or navigate to a directory that contains `.spool/`.
 
 ### Stale or missing state
 
-Run `fabric rebuild` to regenerate `.index.json` and `.state.json` from events.
+Run `spool rebuild` to regenerate `.index.json` and `.state.json` from events.
 
 ### Validation errors
 
-Check the specific error messages from `fabric validate`. Common issues:
+Check the specific error messages from `spool validate`. Common issues:
 - Missing required fields in events
 - Invalid JSON syntax
 - Events for tasks that were never created
 
 ### Merge conflicts
 
-For event file conflicts, keep both sets of events (they're append-only), then run `fabric rebuild`.
+For event file conflicts, keep both sets of events (they're append-only), then run `spool rebuild`.

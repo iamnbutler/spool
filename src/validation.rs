@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use crate::context::FabricContext;
+use crate::context::SpoolContext;
 use crate::state::materialize;
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub struct ValidationResult {
     pub warnings: Vec<String>,
 }
 
-pub fn validate(ctx: &FabricContext, strict: bool) -> Result<ValidationResult> {
+pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let mut seen_ids: HashSet<String> = HashSet::new();

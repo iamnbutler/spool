@@ -1,5 +1,5 @@
 use clap::Parser;
-use fabric::cli::{Cli, Commands, OutputFormat};
+use spool::cli::{Cli, Commands, OutputFormat};
 
 #[test]
 fn test_output_format_from_str() {
@@ -14,13 +14,13 @@ fn test_output_format_from_str() {
 
 #[test]
 fn test_cli_parse_init() {
-    let cli = Cli::parse_from(["fabric", "init"]);
+    let cli = Cli::parse_from(["spool", "init"]);
     assert!(matches!(cli.command, Commands::Init));
 }
 
 #[test]
 fn test_cli_parse_list_defaults() {
-    let cli = Cli::parse_from(["fabric", "list"]);
+    let cli = Cli::parse_from(["spool", "list"]);
 
     if let Commands::List {
         status,
@@ -43,7 +43,7 @@ fn test_cli_parse_list_defaults() {
 #[test]
 fn test_cli_parse_list_with_filters() {
     let cli = Cli::parse_from([
-        "fabric",
+        "spool",
         "list",
         "--status",
         "complete",
@@ -78,7 +78,7 @@ fn test_cli_parse_list_with_filters() {
 #[test]
 fn test_cli_parse_list_short_flags() {
     let cli = Cli::parse_from([
-        "fabric", "list", "-s", "all", "-a", "user", "-t", "feature", "-p", "p2", "-f", "ids",
+        "spool", "list", "-s", "all", "-a", "user", "-t", "feature", "-p", "p2", "-f", "ids",
     ]);
 
     if let Commands::List {
@@ -101,7 +101,7 @@ fn test_cli_parse_list_short_flags() {
 
 #[test]
 fn test_cli_parse_show() {
-    let cli = Cli::parse_from(["fabric", "show", "task-123"]);
+    let cli = Cli::parse_from(["spool", "show", "task-123"]);
 
     if let Commands::Show { id, events } = cli.command {
         assert_eq!(id, "task-123");
@@ -113,7 +113,7 @@ fn test_cli_parse_show() {
 
 #[test]
 fn test_cli_parse_show_with_events() {
-    let cli = Cli::parse_from(["fabric", "show", "task-456", "--events"]);
+    let cli = Cli::parse_from(["spool", "show", "task-456", "--events"]);
 
     if let Commands::Show { id, events } = cli.command {
         assert_eq!(id, "task-456");
@@ -125,13 +125,13 @@ fn test_cli_parse_show_with_events() {
 
 #[test]
 fn test_cli_parse_rebuild() {
-    let cli = Cli::parse_from(["fabric", "rebuild"]);
+    let cli = Cli::parse_from(["spool", "rebuild"]);
     assert!(matches!(cli.command, Commands::Rebuild));
 }
 
 #[test]
 fn test_cli_parse_archive_defaults() {
-    let cli = Cli::parse_from(["fabric", "archive"]);
+    let cli = Cli::parse_from(["spool", "archive"]);
 
     if let Commands::Archive { days, dry_run } = cli.command {
         assert_eq!(days, 30);
@@ -143,7 +143,7 @@ fn test_cli_parse_archive_defaults() {
 
 #[test]
 fn test_cli_parse_archive_with_options() {
-    let cli = Cli::parse_from(["fabric", "archive", "--days", "60", "--dry-run"]);
+    let cli = Cli::parse_from(["spool", "archive", "--days", "60", "--dry-run"]);
 
     if let Commands::Archive { days, dry_run } = cli.command {
         assert_eq!(days, 60);
@@ -155,7 +155,7 @@ fn test_cli_parse_archive_with_options() {
 
 #[test]
 fn test_cli_parse_archive_short_flag() {
-    let cli = Cli::parse_from(["fabric", "archive", "-d", "7"]);
+    let cli = Cli::parse_from(["spool", "archive", "-d", "7"]);
 
     if let Commands::Archive { days, dry_run } = cli.command {
         assert_eq!(days, 7);
@@ -167,7 +167,7 @@ fn test_cli_parse_archive_short_flag() {
 
 #[test]
 fn test_cli_parse_validate() {
-    let cli = Cli::parse_from(["fabric", "validate"]);
+    let cli = Cli::parse_from(["spool", "validate"]);
 
     if let Commands::Validate { strict } = cli.command {
         assert!(!strict);
@@ -178,7 +178,7 @@ fn test_cli_parse_validate() {
 
 #[test]
 fn test_cli_parse_validate_strict() {
-    let cli = Cli::parse_from(["fabric", "validate", "--strict"]);
+    let cli = Cli::parse_from(["spool", "validate", "--strict"]);
 
     if let Commands::Validate { strict } = cli.command {
         assert!(strict);
@@ -204,13 +204,13 @@ fn test_output_format_clone() {
 
 #[test]
 fn test_cli_parse_shell() {
-    let cli = Cli::parse_from(["fabric", "shell"]);
+    let cli = Cli::parse_from(["spool", "shell"]);
     assert!(matches!(cli.command, Commands::Shell));
 }
 
 #[test]
 fn test_cli_parse_complete_defaults() {
-    let cli = Cli::parse_from(["fabric", "complete", "task-123"]);
+    let cli = Cli::parse_from(["spool", "complete", "task-123"]);
 
     if let Commands::Complete { id, resolution } = cli.command {
         assert_eq!(id, "task-123");
@@ -222,7 +222,7 @@ fn test_cli_parse_complete_defaults() {
 
 #[test]
 fn test_cli_parse_complete_with_resolution() {
-    let cli = Cli::parse_from(["fabric", "complete", "task-456", "--resolution", "wontfix"]);
+    let cli = Cli::parse_from(["spool", "complete", "task-456", "--resolution", "wontfix"]);
 
     if let Commands::Complete { id, resolution } = cli.command {
         assert_eq!(id, "task-456");
@@ -234,7 +234,7 @@ fn test_cli_parse_complete_with_resolution() {
 
 #[test]
 fn test_cli_parse_complete_short_flag() {
-    let cli = Cli::parse_from(["fabric", "complete", "task-789", "-r", "duplicate"]);
+    let cli = Cli::parse_from(["spool", "complete", "task-789", "-r", "duplicate"]);
 
     if let Commands::Complete { id, resolution } = cli.command {
         assert_eq!(id, "task-789");
@@ -246,7 +246,7 @@ fn test_cli_parse_complete_short_flag() {
 
 #[test]
 fn test_cli_parse_reopen() {
-    let cli = Cli::parse_from(["fabric", "reopen", "task-abc"]);
+    let cli = Cli::parse_from(["spool", "reopen", "task-abc"]);
 
     if let Commands::Reopen { id } = cli.command {
         assert_eq!(id, "task-abc");
@@ -257,7 +257,7 @@ fn test_cli_parse_reopen() {
 
 #[test]
 fn test_cli_parse_update_with_title() {
-    let cli = Cli::parse_from(["fabric", "update", "task-123", "--title", "New title"]);
+    let cli = Cli::parse_from(["spool", "update", "task-123", "--title", "New title"]);
 
     if let Commands::Update {
         id,
@@ -278,7 +278,7 @@ fn test_cli_parse_update_with_title() {
 #[test]
 fn test_cli_parse_update_with_description() {
     let cli = Cli::parse_from([
-        "fabric",
+        "spool",
         "update",
         "task-456",
         "--description",
@@ -303,7 +303,7 @@ fn test_cli_parse_update_with_description() {
 
 #[test]
 fn test_cli_parse_update_with_priority() {
-    let cli = Cli::parse_from(["fabric", "update", "task-789", "--priority", "p0"]);
+    let cli = Cli::parse_from(["spool", "update", "task-789", "--priority", "p0"]);
 
     if let Commands::Update {
         id,
@@ -324,7 +324,7 @@ fn test_cli_parse_update_with_priority() {
 #[test]
 fn test_cli_parse_update_all_fields() {
     let cli = Cli::parse_from([
-        "fabric",
+        "spool",
         "update",
         "task-full",
         "--title",
@@ -354,7 +354,7 @@ fn test_cli_parse_update_all_fields() {
 #[test]
 fn test_cli_parse_update_short_flags() {
     let cli = Cli::parse_from([
-        "fabric",
+        "spool",
         "update",
         "task-short",
         "-t",
@@ -383,7 +383,7 @@ fn test_cli_parse_update_short_flags() {
 
 #[test]
 fn test_cli_parse_update_no_options() {
-    let cli = Cli::parse_from(["fabric", "update", "task-empty"]);
+    let cli = Cli::parse_from(["spool", "update", "task-empty"]);
 
     if let Commands::Update {
         id,
@@ -403,7 +403,7 @@ fn test_cli_parse_update_no_options() {
 
 #[test]
 fn test_cli_parse_add_basic() {
-    let cli = Cli::parse_from(["fabric", "add", "My task title"]);
+    let cli = Cli::parse_from(["spool", "add", "My task title"]);
 
     if let Commands::Add {
         title,
@@ -426,7 +426,7 @@ fn test_cli_parse_add_basic() {
 #[test]
 fn test_cli_parse_add_with_all_options() {
     let cli = Cli::parse_from([
-        "fabric",
+        "spool",
         "add",
         "Full task",
         "-d",
@@ -461,7 +461,7 @@ fn test_cli_parse_add_with_all_options() {
 
 #[test]
 fn test_cli_parse_assign() {
-    let cli = Cli::parse_from(["fabric", "assign", "task-123", "@bob"]);
+    let cli = Cli::parse_from(["spool", "assign", "task-123", "@bob"]);
 
     if let Commands::Assign { id, assignee } = cli.command {
         assert_eq!(id, "task-123");
@@ -473,7 +473,7 @@ fn test_cli_parse_assign() {
 
 #[test]
 fn test_cli_parse_claim() {
-    let cli = Cli::parse_from(["fabric", "claim", "task-456"]);
+    let cli = Cli::parse_from(["spool", "claim", "task-456"]);
 
     if let Commands::Claim { id } = cli.command {
         assert_eq!(id, "task-456");
@@ -484,7 +484,7 @@ fn test_cli_parse_claim() {
 
 #[test]
 fn test_cli_parse_free() {
-    let cli = Cli::parse_from(["fabric", "free", "task-789"]);
+    let cli = Cli::parse_from(["spool", "free", "task-789"]);
 
     if let Commands::Free { id } = cli.command {
         assert_eq!(id, "task-789");

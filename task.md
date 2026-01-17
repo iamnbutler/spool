@@ -1,6 +1,6 @@
-# Fabric Specification
+# Spool Specification
 
-Fabric is a version-controlled, append-only task management system designed for high-volume, parallel-branch workflows with seamless conflict resolution.
+Spool is a version-controlled, append-only task management system designed for high-volume, parallel-branch workflows with seamless conflict resolution.
 
 ## Goals
 
@@ -13,7 +13,7 @@ Fabric is a version-controlled, append-only task management system designed for 
 ## File Structure
 
 ```
-.fabric/
+.spool/
 ├── events/
 │   ├── 2025-07-14.jsonl    # Daily event log (append-only)
 │   ├── 2025-07-15.jsonl
@@ -28,7 +28,7 @@ Fabric is a version-controlled, append-only task management system designed for 
 
 ### `.gitignore`
 
-Place this file at `.fabric/.gitignore`:
+Place this file at `.spool/.gitignore`:
 
 ```gitignore
 # Derived files - rebuilt from events on checkout/merge
@@ -404,7 +404,7 @@ This enables:
 
 Archival runs when:
 
-- Manually invoked (`fabric archive`)
+- Manually invoked (`spool archive`)
 - Optionally via git hook (post-merge, scheduled)
 
 ### Process
@@ -429,57 +429,57 @@ Same JSONL format as daily files. Events are grouped by task but otherwise uncha
 ## CLI Interface
 
 ```
-fabric add <title> [options]
+spool add <title> [options]
   --priority, -p    low|medium|high|critical
   --assign, -a      @username
   --tag, -t         tag (repeatable)
   --parent          parent_task_id
   --description, -d description text
 
-fabric list [filter]
+spool list [filter]
   --status, -s      open|complete|all (default: open)
   --assignee, -a    @username
   --tag, -t         tag
   --priority, -p    priority level
   --format, -f      table|json|ids
 
-fabric show <id>
+spool show <id>
   --events          Show raw event history
 
-fabric update <id> [options]
+spool update <id> [options]
   --title           New title
   --priority, -p    New priority
   --tag, -t         Add tag
   --untag           Remove tag
   --description, -d New description
 
-fabric assign <id> <@username|->
+spool assign <id> <@username|->
   # Use `-` to unassign
 
-fabric comment <id> <body>
+spool comment <id> <body>
   --ref, -r         Reference (commit, URL, etc.)
 
-fabric complete <id>
+spool complete <id>
   --resolution, -r  done|wontfix|duplicate|obsolete
   --note, -n        Completion note
 
-fabric reopen <id>
+spool reopen <id>
   --reason, -r      Reason for reopening
 
-fabric link <id> <rel> <target_id>
+spool link <id> <rel> <target_id>
   # rel: blocks|blocked_by|related|parent|child
 
-fabric unlink <id> <rel> <target_id>
+spool unlink <id> <rel> <target_id>
 
-fabric archive
+spool archive
   --days, -d        Days after completion to archive (default: 30)
   --dry-run         Show what would be archived
 
-fabric rebuild
+spool rebuild
   # Force rebuild of .index.json and .state.json
 
-fabric init
-  # Initialize .fabric/ directory structure
+spool init
+  # Initialize .spool/ directory structure
 ```
 
 ## Git Integration
@@ -490,7 +490,7 @@ fabric init
 
 ```bash
 #!/bin/sh
-fabric rebuild
+spool rebuild
 ```
 
 This ensures derived files are fresh after branch switches or merges.
@@ -505,7 +505,7 @@ Optionally validate in CI:
 - Events only append (diff should only add lines)
 
 ```bash
-fabric validate
+spool validate
   --strict          Fail on warnings
 ```
 
@@ -546,7 +546,7 @@ Resolution: Keep both lines. The replay algorithm uses timestamps to determine f
 After any merge:
 
 ```bash
-fabric rebuild
+spool rebuild
 ```
 
 This regenerates derived files from the merged event history.
@@ -596,27 +596,27 @@ The `v` field in events allows schema evolution:
 
 ```bash
 # Initialize
-$ fabric init
-Created .fabric/
+$ spool init
+Created .spool/
 
 # Add a task
-$ fabric add "Implement OAuth flow" -p high -t auth -t security -a @nate
+$ spool add "Implement OAuth flow" -p high -t auth -t security -a @nate
 Created lz5k2m-x7k2
 
 # List open tasks
-$ fabric list
+$ spool list
 ID            PRIORITY  ASSIGNEE  TITLE
 lz5k2m-x7k2   high      @nate     Implement OAuth flow
 
 # Add a comment
-$ fabric comment lz5k2m-x7k2 "Should we use PKCE?"
+$ spool comment lz5k2m-x7k2 "Should we use PKCE?"
 Added comment to lz5k2m-x7k2
 
 # Complete
-$ fabric complete lz5k2m-x7k2 -n "Merged in PR #42"
+$ spool complete lz5k2m-x7k2 -n "Merged in PR #42"
 Completed lz5k2m-x7k2
 
 # Archive old tasks
-$ fabric archive --days 30
+$ spool archive --days 30
 Archived 15 tasks to archive/2025-06.jsonl
 ```

@@ -1,29 +1,29 @@
 use std::fs;
 use tempfile::TempDir;
 
-use fabric::context::FabricContext;
-use fabric::event::{Event, Operation};
-use fabric::writer::{
+use spool::context::SpoolContext;
+use spool::event::{Event, Operation};
+use spool::writer::{
     complete_task, create_task, get_current_branch, get_current_user, reopen_task, update_task,
     write_event,
 };
 
-fn setup_fabric_dir(temp_dir: &TempDir) -> std::path::PathBuf {
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
-    fabric_dir
+fn setup_spool_dir(temp_dir: &TempDir) -> std::path::PathBuf {
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
+    spool_dir
 }
 
-fn create_test_context(fabric_dir: &std::path::Path) -> FabricContext {
-    FabricContext::new(fabric_dir.to_path_buf())
+fn create_test_context(spool_dir: &std::path::Path) -> SpoolContext {
+    SpoolContext::new(spool_dir.to_path_buf())
 }
 
 #[test]
 fn test_write_event_creates_file() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let event = Event {
         v: 1,
@@ -50,8 +50,8 @@ fn test_write_event_creates_file() {
 #[test]
 fn test_write_event_appends_to_existing_file() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let event1 = Event {
         v: 1,
@@ -91,8 +91,8 @@ fn test_write_event_appends_to_existing_file() {
 #[test]
 fn test_create_task_returns_id() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let id = create_task(
         &ctx,
@@ -121,8 +121,8 @@ fn test_create_task_returns_id() {
 #[test]
 fn test_create_task_with_all_fields() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let id = create_task(
         &ctx,
@@ -152,8 +152,8 @@ fn test_create_task_with_all_fields() {
 #[test]
 fn test_update_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     update_task(
         &ctx,
@@ -179,8 +179,8 @@ fn test_update_task_writes_event() {
 #[test]
 fn test_update_task_partial_fields() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     // Update only title
     update_task(
@@ -205,8 +205,8 @@ fn test_update_task_partial_fields() {
 #[test]
 fn test_update_task_no_fields_errors() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let result = update_task(&ctx, "task-001", None, None, None, "@tester", "main");
 
@@ -220,8 +220,8 @@ fn test_update_task_no_fields_errors() {
 #[test]
 fn test_complete_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     complete_task(&ctx, "task-001", Some("done"), "@tester", "main").unwrap();
 
@@ -236,8 +236,8 @@ fn test_complete_task_writes_event() {
 #[test]
 fn test_complete_task_default_resolution() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     complete_task(&ctx, "task-001", None, "@tester", "main").unwrap();
 
@@ -250,8 +250,8 @@ fn test_complete_task_default_resolution() {
 #[test]
 fn test_complete_task_wontfix_resolution() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     complete_task(&ctx, "task-001", Some("wontfix"), "@tester", "main").unwrap();
 
@@ -264,8 +264,8 @@ fn test_complete_task_wontfix_resolution() {
 #[test]
 fn test_reopen_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     reopen_task(&ctx, "task-001", "@tester", "main").unwrap();
 
@@ -297,8 +297,8 @@ fn test_get_current_branch_returns_branch() {
 #[test]
 fn test_create_task_generates_unique_ids() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     let id1 = create_task(&ctx, "Task 1", None, None, None, vec![], "@tester", "main").unwrap();
     let id2 = create_task(&ctx, "Task 2", None, None, None, vec![], "@tester", "main").unwrap();
@@ -313,8 +313,8 @@ fn test_create_task_generates_unique_ids() {
 #[test]
 fn test_event_json_format() {
     let temp_dir = TempDir::new().unwrap();
-    let fabric_dir = setup_fabric_dir(&temp_dir);
-    let ctx = create_test_context(&fabric_dir);
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
 
     create_task(&ctx, "Test", None, None, None, vec![], "@tester", "main").unwrap();
 

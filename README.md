@@ -1,4 +1,4 @@
-# Fabric
+# Spool
 
 Git-native, event-sourced task management.
 
@@ -7,13 +7,13 @@ Tasks are stored as append-only event logs in your repository. Every change is t
 ## Installation
 
 ```bash
-cargo install fabric
+cargo install spool
 ```
 
 Or build from source:
 ```bash
-git clone https://github.com/your-username/fabric.git
-cd fabric
+git clone https://github.com/your-username/spool.git
+cd spool
 cargo install --path .
 ```
 
@@ -21,27 +21,27 @@ cargo install --path .
 
 ```bash
 # Initialize in your project
-fabric init
+spool init
 
 # Create tasks
-fabric add "Implement authentication" -p p1 -t feature
-fabric add "Fix login bug" -p p0 -t bug
+spool add "Implement authentication" -p p1 -t feature
+spool add "Fix login bug" -p p0 -t bug
 
 # List and manage
-fabric list
-fabric show task-abc123
-fabric assign task-abc123 @alice
-fabric complete task-abc123
+spool list
+spool show task-abc123
+spool assign task-abc123 @alice
+spool complete task-abc123
 
 # Interactive mode
-fabric shell
+spool shell
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `init` | Initialize `.fabric/` directory |
+| `init` | Initialize `.spool/` directory |
 | `add` | Create a new task |
 | `list` | List tasks with filters |
 | `show` | Show task details |
@@ -58,10 +58,10 @@ fabric shell
 
 ## How It Works
 
-Fabric stores tasks as events in `.fabric/events/`:
+Spool stores tasks as events in `.spool/events/`:
 
 ```
-.fabric/
+.spool/
 ├── events/
 │   ├── 2024-01-15.jsonl
 │   └── 2024-01-16.jsonl

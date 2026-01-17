@@ -3,43 +3,43 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
-fn fabric_cmd() -> Command {
-    Command::new(assert_cmd::cargo::cargo_bin!("fabric"))
+fn spool_cmd() -> Command {
+    Command::new(assert_cmd::cargo::cargo_bin!("spool"))
 }
 
-fn setup_initialized_fabric(temp_dir: &TempDir) {
-    let fabric_dir = temp_dir.path().join(".fabric");
-    fs::create_dir_all(fabric_dir.join("events")).unwrap();
-    fs::create_dir_all(fabric_dir.join("archive")).unwrap();
+fn setup_initialized_spool(temp_dir: &TempDir) {
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
 }
 
 fn write_test_events(temp_dir: &TempDir, events: &str) {
-    let events_dir = temp_dir.path().join(".fabric/events");
+    let events_dir = temp_dir.path().join(".spool/events");
     fs::write(events_dir.join("2024-01-15.jsonl"), events).unwrap();
 }
 
 #[test]
-fn test_init_creates_fabric_dir() {
+fn test_init_creates_spool_dir() {
     let temp_dir = TempDir::new().unwrap();
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("init")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Created .fabric/"));
+        .stdout(predicate::str::contains("Created .spool/"));
 
-    assert!(temp_dir.path().join(".fabric").is_dir());
-    assert!(temp_dir.path().join(".fabric/events").is_dir());
-    assert!(temp_dir.path().join(".fabric/archive").is_dir());
+    assert!(temp_dir.path().join(".spool").is_dir());
+    assert!(temp_dir.path().join(".spool/events").is_dir());
+    assert!(temp_dir.path().join(".spool/archive").is_dir());
 }
 
 #[test]
 fn test_init_fails_if_exists() {
     let temp_dir = TempDir::new().unwrap();
-    fs::create_dir(temp_dir.path().join(".fabric")).unwrap();
+    fs::create_dir(temp_dir.path().join(".spool")).unwrap();
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("init")
         .assert()
@@ -50,9 +50,9 @@ fn test_init_fails_if_exists() {
 #[test]
 fn test_list_empty() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("list")
         .assert()
@@ -63,13 +63,13 @@ fn test_list_empty() {
 #[test]
 fn test_list_shows_tasks() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task","priority":"p1"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("list")
         .assert()
@@ -82,13 +82,13 @@ fn test_list_shows_tasks() {
 #[test]
 fn test_list_json_format() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--format", "json"])
         .assert()
@@ -100,13 +100,13 @@ fn test_list_json_format() {
 #[test]
 fn test_list_ids_format() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--format", "ids"])
         .assert()
@@ -117,7 +117,7 @@ fn test_list_ids_format() {
 #[test]
 fn test_list_status_filter_complete() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         concat!(
@@ -130,7 +130,7 @@ fn test_list_status_filter_complete() {
     );
 
     // Default shows only open
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("list")
         .assert()
@@ -139,7 +139,7 @@ fn test_list_status_filter_complete() {
         .stdout(predicate::str::contains("task-002").not());
 
     // --status complete shows only completed
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--status", "complete"])
         .assert()
@@ -148,7 +148,7 @@ fn test_list_status_filter_complete() {
         .stdout(predicate::str::contains("task-002"));
 
     // --status all shows both
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--status", "all"])
         .assert()
@@ -160,13 +160,13 @@ fn test_list_status_filter_complete() {
 #[test]
 fn test_show_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task","description":"A description","priority":"p1"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["show", "task-001"])
         .assert()
@@ -181,9 +181,9 @@ fn test_show_task() {
 #[test]
 fn test_show_task_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["show", "nonexistent"])
         .assert()
@@ -194,7 +194,7 @@ fn test_show_task_not_found() {
 #[test]
 fn test_show_with_events_flag() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         concat!(
@@ -204,7 +204,7 @@ fn test_show_with_events_flag() {
         ),
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["show", "task-001", "--events"])
         .assert()
@@ -217,13 +217,13 @@ fn test_show_with_events_flag() {
 #[test]
 fn test_complete_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["complete", "task-001"])
         .assert()
@@ -231,7 +231,7 @@ fn test_complete_task() {
         .stdout(predicate::str::contains("Completed task: task-001"));
 
     // Verify task is now complete
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--status", "complete"])
         .assert()
@@ -242,13 +242,13 @@ fn test_complete_task() {
 #[test]
 fn test_complete_task_with_resolution() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["complete", "task-001", "--resolution", "wontfix"])
         .assert()
@@ -259,7 +259,7 @@ fn test_complete_task_with_resolution() {
 #[test]
 fn test_complete_already_complete_errors() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         concat!(
@@ -269,7 +269,7 @@ fn test_complete_already_complete_errors() {
         ),
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["complete", "task-001"])
         .assert()
@@ -280,7 +280,7 @@ fn test_complete_already_complete_errors() {
 #[test]
 fn test_reopen_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         concat!(
@@ -290,7 +290,7 @@ fn test_reopen_task() {
         ),
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["reopen", "task-001"])
         .assert()
@@ -298,7 +298,7 @@ fn test_reopen_task() {
         .stdout(predicate::str::contains("Reopened task: task-001"));
 
     // Verify task is now open
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--status", "open"])
         .assert()
@@ -309,13 +309,13 @@ fn test_reopen_task() {
 #[test]
 fn test_reopen_already_open_errors() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["reopen", "task-001"])
         .assert()
@@ -326,13 +326,13 @@ fn test_reopen_already_open_errors() {
 #[test]
 fn test_update_task_title() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old title"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["update", "task-001", "--title", "New title"])
         .assert()
@@ -340,7 +340,7 @@ fn test_update_task_title() {
         .stdout(predicate::str::contains("Updated task"));
 
     // Verify title changed
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["show", "task-001"])
         .assert()
@@ -351,9 +351,9 @@ fn test_update_task_title() {
 #[test]
 fn test_update_task_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["update", "nonexistent", "--title", "New title"])
         .assert()
@@ -364,17 +364,17 @@ fn test_update_task_not_found() {
 #[test]
 fn test_rebuild_regenerates_state() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
     // Delete state file if exists
-    let state_path = temp_dir.path().join(".fabric/.state.json");
+    let state_path = temp_dir.path().join(".spool/.state.json");
     let _ = fs::remove_file(&state_path);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("rebuild")
         .assert()
@@ -387,13 +387,13 @@ fn test_rebuild_regenerates_state() {
 #[test]
 fn test_validate_valid_events() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("validate")
         .assert()
@@ -401,24 +401,24 @@ fn test_validate_valid_events() {
 }
 
 #[test]
-fn test_command_outside_fabric_dir() {
+fn test_command_outside_spool_dir() {
     let temp_dir = TempDir::new().unwrap();
-    // Don't initialize fabric
+    // Don't initialize spool
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("list")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Not in a fabric directory"));
+        .stderr(predicate::str::contains("Not in a spool directory"));
 }
 
 #[test]
 fn test_missing_required_arg() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("show") // Missing task ID
         .assert()
@@ -428,9 +428,9 @@ fn test_missing_required_arg() {
 #[test]
 fn test_add_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["add", "New task from CLI"])
         .assert()
@@ -438,7 +438,7 @@ fn test_add_task() {
         .stdout(predicate::str::contains("Created task:"));
 
     // Verify task appears in list
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .arg("list")
         .assert()
@@ -449,9 +449,9 @@ fn test_add_task() {
 #[test]
 fn test_add_task_with_options() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args([
             "add",
@@ -468,7 +468,7 @@ fn test_add_task_with_options() {
         .stdout(predicate::str::contains("Created task:"));
 
     // Verify task details
-    let output = fabric_cmd()
+    let output = spool_cmd()
         .current_dir(temp_dir.path())
         .args(["list", "--format", "json"])
         .assert()
@@ -482,13 +482,13 @@ fn test_add_task_with_options() {
 #[test]
 fn test_assign_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["assign", "task-001", "@alice"])
         .assert()
@@ -496,7 +496,7 @@ fn test_assign_task() {
         .stdout(predicate::str::contains("Assigned task task-001 to @alice"));
 
     // Verify assignment
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["show", "task-001"])
         .assert()
@@ -507,9 +507,9 @@ fn test_assign_task() {
 #[test]
 fn test_assign_task_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["assign", "nonexistent", "@alice"])
         .assert()
@@ -520,13 +520,13 @@ fn test_assign_task_not_found() {
 #[test]
 fn test_claim_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["claim", "task-001"])
         .assert()
@@ -537,9 +537,9 @@ fn test_claim_task() {
 #[test]
 fn test_claim_task_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["claim", "nonexistent"])
         .assert()
@@ -550,13 +550,13 @@ fn test_claim_task_not_found() {
 #[test]
 fn test_free_task() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
     write_test_events(
         &temp_dir,
         r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task","assignee":"@alice"}}"#,
     );
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["free", "task-001"])
         .assert()
@@ -567,9 +567,9 @@ fn test_free_task() {
 #[test]
 fn test_free_task_not_found() {
     let temp_dir = TempDir::new().unwrap();
-    setup_initialized_fabric(&temp_dir);
+    setup_initialized_spool(&temp_dir);
 
-    fabric_cmd()
+    spool_cmd()
         .current_dir(temp_dir.path())
         .args(["free", "nonexistent"])
         .assert()
