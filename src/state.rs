@@ -7,10 +7,6 @@ use std::fs;
 use crate::context::FabricContext;
 use crate::event::{Event, Operation};
 
-// =============================================================================
-// Task State Types
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Task {
     pub id: String,
@@ -61,10 +57,6 @@ pub struct Comment {
     pub r#ref: Option<String>,
 }
 
-// =============================================================================
-// Index Types
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Index {
     pub tasks: HashMap<String, TaskIndex>,
@@ -83,19 +75,11 @@ pub struct TaskIndex {
     pub archived: Option<String>,
 }
 
-// =============================================================================
-// State (materialized view)
-// =============================================================================
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {
     pub tasks: HashMap<String, Task>,
     pub rebuilt: DateTime<Utc>,
 }
-
-// =============================================================================
-// State Materialization
-// =============================================================================
 
 pub fn materialize(ctx: &FabricContext) -> Result<State> {
     let mut tasks: HashMap<String, Task> = HashMap::new();
@@ -310,10 +294,6 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
     }
 }
 
-// =============================================================================
-// Index Building
-// =============================================================================
-
 #[allow(clippy::type_complexity)]
 pub fn build_index(ctx: &FabricContext) -> Result<Index> {
     let mut task_files: HashMap<String, HashSet<String>> = HashMap::new();
@@ -403,10 +383,6 @@ pub fn build_index(ctx: &FabricContext) -> Result<Index> {
     })
 }
 
-// =============================================================================
-// State Loading
-// =============================================================================
-
 pub fn load_or_materialize_state(ctx: &FabricContext) -> Result<State> {
     let state_path = ctx.state_path();
     if state_path.exists() {
@@ -417,10 +393,6 @@ pub fn load_or_materialize_state(ctx: &FabricContext) -> Result<State> {
         materialize(ctx)
     }
 }
-
-// =============================================================================
-// Rebuild
-// =============================================================================
 
 pub fn rebuild(ctx: &FabricContext) -> Result<()> {
     println!("Rebuilding index and state...");

@@ -18,10 +18,6 @@ fn write_test_events(temp_dir: &TempDir, events: &str) {
     fs::write(events_dir.join("2024-01-15.jsonl"), events).unwrap();
 }
 
-// =============================================================================
-// Init Command
-// =============================================================================
-
 #[test]
 fn test_init_creates_fabric_dir() {
     let temp_dir = TempDir::new().unwrap();
@@ -50,10 +46,6 @@ fn test_init_fails_if_exists() {
         .failure()
         .stderr(predicate::str::contains("already exists"));
 }
-
-// =============================================================================
-// List Command
-// =============================================================================
 
 #[test]
 fn test_list_empty() {
@@ -165,10 +157,6 @@ fn test_list_status_filter_complete() {
         .stdout(predicate::str::contains("task-002"));
 }
 
-// =============================================================================
-// Show Command
-// =============================================================================
-
 #[test]
 fn test_show_task() {
     let temp_dir = TempDir::new().unwrap();
@@ -225,10 +213,6 @@ fn test_show_with_events_flag() {
         .stdout(predicate::str::contains("create"))
         .stdout(predicate::str::contains("update"));
 }
-
-// =============================================================================
-// Complete Command
-// =============================================================================
 
 #[test]
 fn test_complete_task() {
@@ -293,10 +277,6 @@ fn test_complete_already_complete_errors() {
         .stderr(predicate::str::contains("already complete"));
 }
 
-// =============================================================================
-// Reopen Command
-// =============================================================================
-
 #[test]
 fn test_reopen_task() {
     let temp_dir = TempDir::new().unwrap();
@@ -343,10 +323,6 @@ fn test_reopen_already_open_errors() {
         .stderr(predicate::str::contains("already open"));
 }
 
-// =============================================================================
-// Update Command
-// =============================================================================
-
 #[test]
 fn test_update_task_title() {
     let temp_dir = TempDir::new().unwrap();
@@ -385,10 +361,6 @@ fn test_update_task_not_found() {
         .stderr(predicate::str::contains("not found"));
 }
 
-// =============================================================================
-// Rebuild Command
-// =============================================================================
-
 #[test]
 fn test_rebuild_regenerates_state() {
     let temp_dir = TempDir::new().unwrap();
@@ -412,10 +384,6 @@ fn test_rebuild_regenerates_state() {
     assert!(state_path.exists());
 }
 
-// =============================================================================
-// Validate Command
-// =============================================================================
-
 #[test]
 fn test_validate_valid_events() {
     let temp_dir = TempDir::new().unwrap();
@@ -431,10 +399,6 @@ fn test_validate_valid_events() {
         .assert()
         .success();
 }
-
-// =============================================================================
-// Error Cases
-// =============================================================================
 
 #[test]
 fn test_command_outside_fabric_dir() {
@@ -460,10 +424,6 @@ fn test_missing_required_arg() {
         .assert()
         .failure();
 }
-
-// =============================================================================
-// Add Command
-// =============================================================================
 
 #[test]
 fn test_add_task() {
@@ -519,10 +479,6 @@ fn test_add_task_with_options() {
     assert!(stdout.contains("p0"));
 }
 
-// =============================================================================
-// Assign Command
-// =============================================================================
-
 #[test]
 fn test_assign_task() {
     let temp_dir = TempDir::new().unwrap();
@@ -561,10 +517,6 @@ fn test_assign_task_not_found() {
         .stderr(predicate::str::contains("not found"));
 }
 
-// =============================================================================
-// Claim Command
-// =============================================================================
-
 #[test]
 fn test_claim_task() {
     let temp_dir = TempDir::new().unwrap();
@@ -594,10 +546,6 @@ fn test_claim_task_not_found() {
         .failure()
         .stderr(predicate::str::contains("not found"));
 }
-
-// =============================================================================
-// Free Command
-// =============================================================================
 
 #[test]
 fn test_free_task() {

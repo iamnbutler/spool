@@ -15,10 +15,6 @@ use crate::context::FabricContext;
 use crate::state::load_or_materialize_state;
 use crate::writer::{create_task, get_current_branch, get_current_user};
 
-// =============================================================================
-// Shell Commands
-// =============================================================================
-
 const COMMANDS: &[&str] = &[
     "add", "list", "show", "update", "complete", "reopen", "help", "quit", "exit",
 ];
@@ -54,10 +50,6 @@ Commands:
 Tab completion is available for commands and task IDs.
 Use Up/Down arrows to navigate command history.
 "#;
-
-// =============================================================================
-// Completer
-// =============================================================================
 
 struct FabricCompleter {
     ctx: FabricContext,
@@ -209,10 +201,6 @@ impl Highlighter for FabricCompleter {
 impl Validator for FabricCompleter {}
 
 impl Helper for FabricCompleter {}
-
-// =============================================================================
-// Command Parsing & Execution
-// =============================================================================
 
 /// Split a command line respecting quoted strings
 fn shell_split(line: &str) -> Vec<String> {
@@ -521,10 +509,6 @@ fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
 
     Ok(true)
 }
-
-// =============================================================================
-// Shell Entry Point
-// =============================================================================
 
 /// Run the interactive shell
 pub fn run_shell(ctx: FabricContext) -> Result<()> {
