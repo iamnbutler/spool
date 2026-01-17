@@ -84,6 +84,83 @@ pub fn get_current_branch() -> Result<String> {
     }
 }
 
+/// Update a task's fields
+pub fn update_task(
+    ctx: &FabricContext,
+    id: &str,
+    title: Option<&str>,
+    description: Option<&str>,
+    priority: Option<&str>,
+    by: &str,
+    branch: &str,
+) -> Result<()> {
+    let mut d = serde_json::Map::new();
+
+    if let Some(t) = title {
+        d.insert("title".to_string(), serde_json::Value::String(t.to_string()));
+    }
+    if let Some(desc) = description {
+        d.insert("description".to_string(), serde_json::Value::String(desc.to_string()));
+    }
+    if let Some(p) = priority {
+        d.insert("priority".to_string(), serde_json::Value::String(p.to_string()));
+    }
+
+    if d.is_empty() {
+        return Err(anyhow::anyhow!("No fields to update"));
+    }
+
+    let event = Event {
+        v: 1,
+        op: Operation::Update,
+        id: id.to_string(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d: serde_json::Value::Object(d),
+    };
+
+    write_event(ctx, &event)
+}
+
+/// Complete a task
+pub fn complete_task(
+    ctx: &FabricContext,
+    id: &str,
+    resolution: Option<&str>,
+    by: &str,
+    branch: &str,
+) -> Result<()> {
+    let event = Event {
+        v: 1,
+        op: Operation::Complete,
+        id: id.to_string(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d: serde_json::json!({
+            "resolution": resolution.unwrap_or("done")
+        }),
+    };
+
+    write_event(ctx, &event)
+}
+
+/// Reopen a completed task
+pub fn reopen_task(ctx: &FabricContext, id: &str, by: &str, branch: &str) -> Result<()> {
+    let event = Event {
+        v: 1,
+        op: Operation::Reopen,
+        id: id.to_string(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d: serde_json::json!({}),
+    };
+
+    write_event(ctx, &event)
+}
+
 /// Get the current user (from git config or environment)
 pub fn get_current_user() -> Result<String> {
     // Try git config first

@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 use crate::archive::collect_all_events;
 use crate::context::FabricContext;
 use crate::state::{load_or_materialize_state, Task, TaskStatus};
+use crate::writer::{complete_task as write_complete, get_current_branch, get_current_user, reopen_task as write_reopen, update_task as write_update};
 
 #[derive(Parser)]
 #[command(name = "fabric")]
@@ -62,6 +63,33 @@ pub enum Commands {
     },
     /// Start interactive shell mode
     Shell,
+    /// Mark a task as complete
+    Complete {
+        /// Task ID to complete
+        id: String,
+        /// Resolution: done, wontfix, duplicate, obsolete
+        #[arg(short, long, default_value = "done")]
+        resolution: String,
+    },
+    /// Reopen a completed task
+    Reopen {
+        /// Task ID to reopen
+        id: String,
+    },
+    /// Update a task's fields
+    Update {
+        /// Task ID to update
+        id: String,
+        /// New title
+        #[arg(short, long)]
+        title: Option<String>,
+        /// New description
+        #[arg(short, long)]
+        description: Option<String>,
+        /// New priority
+        #[arg(short, long)]
+        priority: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -234,6 +262,87 @@ pub fn show_task(ctx: &FabricContext, id: &str, show_events: bool) -> Result<()>
             }
         }
     }
+
+    Ok(())
+}
+
+pub fn complete_task(ctx: &FabricContext, id: &str, resolution: Option<&str>) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify task exists
+    let task = state
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+
+    // Check if already complete
+    if task.status == TaskStatus::Complete {
+        return Err(anyhow!("Task is already complete: {}", id));
+    }
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_complete(ctx, id, resolution, &user, &branch)?;
+    println!("Completed task: {} ({})", id, resolution.unwrap_or("done"));
+
+    Ok(())
+}
+
+pub fn reopen_task(ctx: &FabricContext, id: &str) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify task exists
+    let task = state
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+
+    // Check if already open
+    if task.status == TaskStatus::Open {
+        return Err(anyhow!("Task is already open: {}", id));
+    }
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_reopen(ctx, id, &user, &branch)?;
+    println!("Reopened task: {}", id);
+
+    Ok(())
+}
+
+pub fn update_task(
+    ctx: &FabricContext,
+    id: &str,
+    title: Option<&str>,
+    description: Option<&str>,
+    priority: Option<&str>,
+) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify task exists
+    state
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_update(ctx, id, title, description, priority, &user, &branch)?;
+
+    let mut updates = Vec::new();
+    if title.is_some() {
+        updates.push("title");
+    }
+    if description.is_some() {
+        updates.push("description");
+    }
+    if priority.is_some() {
+        updates.push("priority");
+    }
+    println!("Updated task {}: {}", id, updates.join(", "));
 
     Ok(())
 }

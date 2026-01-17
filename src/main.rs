@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use fabric::archive::archive_tasks;
-use fabric::cli::{list_tasks, show_task, Cli, Commands, OutputFormat};
+use fabric::cli::{complete_task, list_tasks, reopen_task, show_task, update_task, Cli, Commands, OutputFormat};
 use fabric::context::{init, FabricContext};
 use fabric::shell::run_shell;
 use fabric::state::rebuild;
@@ -52,6 +52,29 @@ fn main() -> Result<()> {
         Commands::Shell => {
             let ctx = FabricContext::discover()?;
             run_shell(ctx)
+        }
+        Commands::Complete { id, resolution } => {
+            let ctx = FabricContext::discover()?;
+            complete_task(&ctx, &id, Some(&resolution))
+        }
+        Commands::Reopen { id } => {
+            let ctx = FabricContext::discover()?;
+            reopen_task(&ctx, &id)
+        }
+        Commands::Update {
+            id,
+            title,
+            description,
+            priority,
+        } => {
+            let ctx = FabricContext::discover()?;
+            update_task(
+                &ctx,
+                &id,
+                title.as_deref(),
+                description.as_deref(),
+                priority.as_deref(),
+            )
         }
     }
 }

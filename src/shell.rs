@@ -10,7 +10,7 @@ use rustyline::validate::Validator;
 use rustyline::{Config, Editor, Helper};
 use std::borrow::Cow;
 
-use crate::cli::{list_tasks, show_task, OutputFormat};
+use crate::cli::{complete_task, list_tasks, reopen_task, show_task, update_task, OutputFormat};
 use crate::context::FabricContext;
 use crate::state::load_or_materialize_state;
 use crate::writer::{create_task, get_current_branch, get_current_user};
@@ -19,7 +19,7 @@ use crate::writer::{create_task, get_current_branch, get_current_user};
 // Shell Commands
 // =============================================================================
 
-const COMMANDS: &[&str] = &["add", "list", "show", "help", "quit", "exit"];
+const COMMANDS: &[&str] = &["add", "list", "show", "update", "complete", "reopen", "help", "quit", "exit"];
 
 const HELP_TEXT: &str = r#"
 fabric shell - Interactive mode
@@ -33,6 +33,15 @@ Commands:
 
   show <task-id> [--events]
       Show details of a specific task
+
+  update <task-id> [-t <title>] [-d <description>] [-p <priority>]
+      Update a task's fields
+
+  complete <task-id> [-r <resolution>]
+      Mark a task as complete (resolution: done, wontfix, duplicate, obsolete)
+
+  reopen <task-id>
+      Reopen a completed task
 
   help
       Show this help message
@@ -91,8 +100,11 @@ impl Completer for FabricCompleter {
             return Ok((start, candidates));
         }
 
-        // If we're completing after 'show', complete task IDs
-        if words.first() == Some(&"show") && words.len() <= 2 {
+        // If we're completing after 'show', 'update', 'complete', or 'reopen', complete task IDs
+        let cmd = words.first().copied();
+        if (cmd == Some("show") || cmd == Some("update") || cmd == Some("complete") || cmd == Some("reopen"))
+            && words.len() <= 2
+        {
             let prefix = if line_to_cursor.ends_with(' ') {
                 ""
             } else {
@@ -329,6 +341,53 @@ fn parse_show_args(args: &[&str]) -> Result<(String, bool)> {
     Ok((id, events))
 }
 
+fn parse_resolution_arg(args: &[&str]) -> Option<String> {
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "-r" || args[i] == "--resolution" {
+            if i + 1 < args.len() {
+                return Some(args[i + 1].to_string());
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn parse_update_args(args: &[&str]) -> (Option<String>, Option<String>, Option<String>) {
+    let mut title = None;
+    let mut description = None;
+    let mut priority = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i] {
+            "-t" | "--title" => {
+                i += 1;
+                if i < args.len() {
+                    title = Some(args[i].to_string());
+                }
+            }
+            "-d" | "--description" => {
+                i += 1;
+                if i < args.len() {
+                    description = Some(args[i].to_string());
+                }
+            }
+            "-p" | "--priority" => {
+                i += 1;
+                if i < args.len() {
+                    priority = Some(args[i].to_string());
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    (title, description, priority)
+}
+
 fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
     let parts: Vec<&str> = line.split_whitespace().collect();
     if parts.is_empty() {
@@ -376,6 +435,33 @@ fn execute_command(ctx: &FabricContext, line: &str) -> Result<bool> {
         "show" => {
             let (id, events) = parse_show_args(args)?;
             show_task(ctx, &id, events)?;
+        }
+        "update" | "edit" => {
+            if args.is_empty() {
+                return Err(anyhow!(
+                    "Usage: update <task-id> [-t title] [-d description] [-p priority]"
+                ));
+            }
+            let id = args[0];
+            let (title, description, priority) = parse_update_args(&args[1..]);
+            update_task(ctx, id, title.as_deref(), description.as_deref(), priority.as_deref())?;
+        }
+        "complete" | "done" | "close" => {
+            if args.is_empty() {
+                return Err(anyhow!(
+                    "Usage: complete <task-id> [-r done|wontfix|duplicate|obsolete]"
+                ));
+            }
+            let id = args[0];
+            let resolution = parse_resolution_arg(args);
+            complete_task(ctx, id, resolution.as_deref())?;
+        }
+        "reopen" => {
+            if args.is_empty() {
+                return Err(anyhow!("Usage: reopen <task-id>"));
+            }
+            let id = args[0];
+            reopen_task(ctx, id)?;
         }
         _ => {
             println!(
