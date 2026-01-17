@@ -207,3 +207,188 @@ fn test_cli_parse_shell() {
     let cli = Cli::parse_from(["fabric", "shell"]);
     assert!(matches!(cli.command, Commands::Shell));
 }
+
+#[test]
+fn test_cli_parse_complete_defaults() {
+    let cli = Cli::parse_from(["fabric", "complete", "task-123"]);
+
+    if let Commands::Complete { id, resolution } = cli.command {
+        assert_eq!(id, "task-123");
+        assert_eq!(resolution, "done");
+    } else {
+        panic!("Expected Complete command");
+    }
+}
+
+#[test]
+fn test_cli_parse_complete_with_resolution() {
+    let cli = Cli::parse_from(["fabric", "complete", "task-456", "--resolution", "wontfix"]);
+
+    if let Commands::Complete { id, resolution } = cli.command {
+        assert_eq!(id, "task-456");
+        assert_eq!(resolution, "wontfix");
+    } else {
+        panic!("Expected Complete command");
+    }
+}
+
+#[test]
+fn test_cli_parse_complete_short_flag() {
+    let cli = Cli::parse_from(["fabric", "complete", "task-789", "-r", "duplicate"]);
+
+    if let Commands::Complete { id, resolution } = cli.command {
+        assert_eq!(id, "task-789");
+        assert_eq!(resolution, "duplicate");
+    } else {
+        panic!("Expected Complete command");
+    }
+}
+
+#[test]
+fn test_cli_parse_reopen() {
+    let cli = Cli::parse_from(["fabric", "reopen", "task-abc"]);
+
+    if let Commands::Reopen { id } = cli.command {
+        assert_eq!(id, "task-abc");
+    } else {
+        panic!("Expected Reopen command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_with_title() {
+    let cli = Cli::parse_from(["fabric", "update", "task-123", "--title", "New title"]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-123");
+        assert_eq!(title.as_deref(), Some("New title"));
+        assert!(description.is_none());
+        assert!(priority.is_none());
+    } else {
+        panic!("Expected Update command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_with_description() {
+    let cli = Cli::parse_from([
+        "fabric",
+        "update",
+        "task-456",
+        "--description",
+        "Updated description",
+    ]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-456");
+        assert!(title.is_none());
+        assert_eq!(description.as_deref(), Some("Updated description"));
+        assert!(priority.is_none());
+    } else {
+        panic!("Expected Update command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_with_priority() {
+    let cli = Cli::parse_from(["fabric", "update", "task-789", "--priority", "p0"]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-789");
+        assert!(title.is_none());
+        assert!(description.is_none());
+        assert_eq!(priority.as_deref(), Some("p0"));
+    } else {
+        panic!("Expected Update command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_all_fields() {
+    let cli = Cli::parse_from([
+        "fabric",
+        "update",
+        "task-full",
+        "--title",
+        "Full update",
+        "--description",
+        "Complete description",
+        "--priority",
+        "p1",
+    ]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-full");
+        assert_eq!(title.as_deref(), Some("Full update"));
+        assert_eq!(description.as_deref(), Some("Complete description"));
+        assert_eq!(priority.as_deref(), Some("p1"));
+    } else {
+        panic!("Expected Update command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_short_flags() {
+    let cli = Cli::parse_from([
+        "fabric", "update", "task-short", "-t", "Short title", "-d", "Short desc", "-p", "p2",
+    ]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-short");
+        assert_eq!(title.as_deref(), Some("Short title"));
+        assert_eq!(description.as_deref(), Some("Short desc"));
+        assert_eq!(priority.as_deref(), Some("p2"));
+    } else {
+        panic!("Expected Update command");
+    }
+}
+
+#[test]
+fn test_cli_parse_update_no_options() {
+    let cli = Cli::parse_from(["fabric", "update", "task-empty"]);
+
+    if let Commands::Update {
+        id,
+        title,
+        description,
+        priority,
+    } = cli.command
+    {
+        assert_eq!(id, "task-empty");
+        assert!(title.is_none());
+        assert!(description.is_none());
+        assert!(priority.is_none());
+    } else {
+        panic!("Expected Update command");
+    }
+}
