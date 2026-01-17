@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
 usage() {
     echo "Usage: script/release [--major | --minor | --patch]"
     echo ""
-    echo "Increments the version number, updates all references,"
-    echo "creates a git tag, GitHub release, and publishes to crates.io."
+    echo "Increments the version number, creates a release PR,"
+    echo "and after merge, tags and publishes the release."
     echo ""
     echo "Options:"
     echo "  --major    Bump major version (x.0.0)"
@@ -22,20 +22,11 @@ usage() {
     exit 1
 }
 
-log() {
-    echo -e "${GREEN}==>${NC} $1"
-}
+log() { echo -e "${GREEN}==>${NC} $1"; }
+info() { echo -e "${BLUE}   ${NC} $1"; }
+warn() { echo -e "${YELLOW}warning:${NC} $1"; }
+error() { echo -e "${RED}error:${NC} $1" >&2; exit 1; }
 
-warn() {
-    echo -e "${YELLOW}warning:${NC} $1"
-}
-
-error() {
-    echo -e "${RED}error:${NC} $1" >&2
-    exit 1
-}
-
-# Parse arguments
 BUMP_TYPE=""
 DRY_RUN=false
 
@@ -50,132 +41,102 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$BUMP_TYPE" ]]; then
-    error "Must specify --major, --minor, or --patch"
-fi
+[[ -z "$BUMP_TYPE" ]] && error "Must specify --major, --minor, or --patch"
+[[ ! -f "Cargo.toml" ]] && error "Must run from repository root"
 
-# Ensure we're in the repo root
-if [[ ! -f "Cargo.toml" ]]; then
-    error "Must run from repository root"
-fi
-
-# Ensure working directory is clean
 if [[ -n "$(git status --porcelain)" ]]; then
     error "Working directory is not clean. Commit or stash changes first."
 fi
 
-# Ensure we're on main branch
 CURRENT_BRANCH=$(git branch --show-current)
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    error "Must be on main branch (currently on $CURRENT_BRANCH)"
-fi
+[[ "$CURRENT_BRANCH" != "main" ]] && error "Must be on main branch (currently on $CURRENT_BRANCH)"
 
-# Ensure main is up to date
 git fetch origin main
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
-if [[ "$LOCAL" != "$REMOTE" ]]; then
-    error "Local main is not up to date with origin. Run 'git pull' first."
-fi
+[[ "$LOCAL" != "$REMOTE" ]] && error "Local main is not up to date with origin. Run 'git pull' first."
 
-# Get current version from Cargo.toml
 CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-if [[ -z "$CURRENT_VERSION" ]]; then
-    error "Could not read version from Cargo.toml"
-fi
+[[ -z "$CURRENT_VERSION" ]] && error "Could not read version from Cargo.toml"
 
 log "Current version: $CURRENT_VERSION"
 
-# Parse version components
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
 
-# Increment version
 case $BUMP_TYPE in
-    major)
-        MAJOR=$((MAJOR + 1))
-        MINOR=0
-        PATCH=0
-        ;;
-    minor)
-        MINOR=$((MINOR + 1))
-        PATCH=0
-        ;;
-    patch)
-        PATCH=$((PATCH + 1))
-        ;;
+    major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+    minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+    patch) PATCH=$((PATCH + 1)) ;;
 esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+RELEASE_BRANCH="release/v${NEW_VERSION}"
+
 log "New version: $NEW_VERSION"
 
 if $DRY_RUN; then
-    log "[dry-run] Would update Cargo.toml"
-    log "[dry-run] Would update src/shell.rs"
-    log "[dry-run] Would update Cargo.lock"
-    log "[dry-run] Would commit with message: Release v$NEW_VERSION"
-    log "[dry-run] Would create tag: v$NEW_VERSION"
-    log "[dry-run] Would push to origin"
+    log "[dry-run] Would create branch: $RELEASE_BRANCH"
+    log "[dry-run] Would update Cargo.toml, src/shell.rs, Cargo.lock"
+    log "[dry-run] Would create PR for release"
+    log "[dry-run] After PR merge, would tag v$NEW_VERSION"
     log "[dry-run] Would create GitHub release"
     log "[dry-run] Would publish to crates.io"
     exit 0
 fi
 
-# Update Cargo.toml
+# Create release branch
+log "Creating release branch..."
+git checkout -b "$RELEASE_BRANCH"
+
+# Update versions
 log "Updating Cargo.toml..."
 sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
 
-# Update shell.rs version string
 log "Updating src/shell.rs..."
 sed -i '' "s/spool shell v$CURRENT_VERSION/spool shell v$NEW_VERSION/" src/shell.rs
 
-# Update Cargo.lock
 log "Updating Cargo.lock..."
-cargo update --package spool
+cargo update --package spool --quiet
 
-# Run tests to make sure everything works
+# Run tests
 log "Running tests..."
 cargo test --quiet
 
-# Run clippy
 log "Running clippy..."
 cargo clippy --quiet -- -D warnings
 
-# Commit changes
+# Commit and push
 log "Committing changes..."
 git add Cargo.toml Cargo.lock src/shell.rs
 git commit -m "Release v$NEW_VERSION"
 
-# Create tag
-log "Creating tag v$NEW_VERSION..."
-git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+log "Pushing release branch..."
+git push -u origin "$RELEASE_BRANCH"
 
-# Push to origin
-log "Pushing to origin..."
-git push origin main
-git push origin "v$NEW_VERSION"
+# Create PR
+log "Creating release PR..."
+PR_URL=$(gh pr create \
+    --title "Release v$NEW_VERSION" \
+    --body "## Release v$NEW_VERSION
 
-# Create GitHub release
-log "Creating GitHub release..."
-gh release create "v$NEW_VERSION" \
-    --title "v$NEW_VERSION" \
-    --generate-notes
+Bumps version from $CURRENT_VERSION to $NEW_VERSION.
 
-# Publish to crates.io
-log "Publishing to crates.io..."
-echo ""
-warn "About to publish to crates.io. This cannot be undone."
-read -p "Continue? [y/N] " -n 1 -r
-echo ""
+### Changes
+- Updated version in Cargo.toml
+- Updated version in src/shell.rs
+- Updated Cargo.lock
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cargo publish
-    log "Published to crates.io!"
-else
-    warn "Skipped crates.io publish. Run 'cargo publish' manually when ready."
-fi
+### After merge
+Run \`script/release-tag $NEW_VERSION\` to:
+- Create git tag v$NEW_VERSION
+- Create GitHub release
+- Publish to crates.io" \
+    --head "$RELEASE_BRANCH" \
+    --base main)
 
 echo ""
-log "Release v$NEW_VERSION complete!"
+log "Release PR created: $PR_URL"
 echo ""
-echo "  GitHub: https://github.com/iamnbutler/spool/releases/tag/v$NEW_VERSION"
-echo "  crates.io: https://crates.io/crates/spool"
+info "Next steps:"
+info "1. Review and merge the PR"
+info "2. Run: script/release-tag $NEW_VERSION"
