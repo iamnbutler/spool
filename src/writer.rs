@@ -7,6 +7,17 @@ use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 use crate::id::generate_id;
 
+/// Parameters for creating a new task
+#[derive(Default)]
+pub struct CreateTaskParams<'a> {
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub priority: Option<&'a str>,
+    pub assignee: Option<&'a str>,
+    pub tags: Vec<String>,
+    pub stream: Option<&'a str>,
+}
+
 /// Write an event to the current day's event file
 pub fn write_event(ctx: &SpoolContext, event: &Event) -> Result<()> {
     let today = Utc::now().format("%Y-%m-%d").to_string();
@@ -26,38 +37,37 @@ pub fn write_event(ctx: &SpoolContext, event: &Event) -> Result<()> {
 }
 
 /// Create a new task and return its ID
-#[allow(clippy::too_many_arguments)]
 pub fn create_task(
     ctx: &SpoolContext,
-    title: &str,
-    description: Option<&str>,
-    priority: Option<&str>,
-    assignee: Option<&str>,
-    tags: Vec<String>,
-    stream: Option<&str>,
+    params: CreateTaskParams,
     by: &str,
     branch: &str,
 ) -> Result<String> {
     let id = generate_id();
 
     let mut d = serde_json::json!({
-        "title": title,
+        "title": params.title,
     });
 
-    if let Some(desc) = description {
+    if let Some(desc) = params.description {
         d["description"] = serde_json::Value::String(desc.to_string());
     }
-    if let Some(p) = priority {
+    if let Some(p) = params.priority {
         d["priority"] = serde_json::Value::String(p.to_string());
     }
-    if let Some(a) = assignee {
+    if let Some(a) = params.assignee {
         d["assignee"] = serde_json::Value::String(a.to_string());
     }
-    if !tags.is_empty() {
-        d["tags"] =
-            serde_json::Value::Array(tags.into_iter().map(serde_json::Value::String).collect());
+    if !params.tags.is_empty() {
+        d["tags"] = serde_json::Value::Array(
+            params
+                .tags
+                .into_iter()
+                .map(serde_json::Value::String)
+                .collect(),
+        );
     }
-    if let Some(s) = stream {
+    if let Some(s) = params.stream {
         d["stream"] = serde_json::Value::String(s.to_string());
     }
 

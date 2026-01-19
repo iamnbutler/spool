@@ -309,13 +309,18 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
     }
 }
 
-#[allow(clippy::type_complexity)]
+/// Internal struct for building task index entries
+struct TaskIndexBuilder {
+    status: TaskStatus,
+    created: String,
+    updated: String,
+    completed: Option<String>,
+    archived: Option<String>,
+}
+
 pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
     let mut task_files: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut task_info: HashMap<
-        String,
-        (TaskStatus, String, String, Option<String>, Option<String>),
-    > = HashMap::new();
+    let mut task_info: HashMap<String, TaskIndexBuilder> = HashMap::new();
 
     for file in ctx.get_event_files()? {
         let filename = file.file_name().unwrap().to_string_lossy().to_string();
@@ -332,27 +337,33 @@ pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
                 Operation::Create => {
                     task_info.insert(
                         event.id.clone(),
-                        (TaskStatus::Open, date.clone(), date, None, None),
+                        TaskIndexBuilder {
+                            status: TaskStatus::Open,
+                            created: date.clone(),
+                            updated: date,
+                            completed: None,
+                            archived: None,
+                        },
                     );
                 }
                 Operation::Complete => {
                     if let Some(info) = task_info.get_mut(&event.id) {
-                        info.0 = TaskStatus::Complete;
-                        info.2 = date.clone();
-                        info.3 = Some(date);
+                        info.status = TaskStatus::Complete;
+                        info.updated = date.clone();
+                        info.completed = Some(date);
                     }
                 }
                 Operation::Reopen => {
                     if let Some(info) = task_info.get_mut(&event.id) {
-                        info.0 = TaskStatus::Open;
-                        info.2 = date;
-                        info.3 = None;
+                        info.status = TaskStatus::Open;
+                        info.updated = date;
+                        info.completed = None;
                     }
                 }
                 Operation::Archive => {
                     if let Some(info) = task_info.get_mut(&event.id) {
-                        info.2 = date;
-                        info.4 = event
+                        info.updated = date;
+                        info.archived = event
                             .d
                             .get("ref")
                             .and_then(|v| v.as_str())
@@ -361,7 +372,7 @@ pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
                 }
                 _ => {
                     if let Some(info) = task_info.get_mut(&event.id) {
-                        info.2 = date;
+                        info.updated = date;
                     }
                 }
             }
@@ -382,12 +393,12 @@ pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
         tasks.insert(
             id,
             TaskIndex {
-                status: info.0,
-                created: info.1,
-                updated: info.2,
-                completed: info.3,
+                status: info.status,
+                created: info.created,
+                updated: info.updated,
+                completed: info.completed,
                 files,
-                archived: info.4,
+                archived: info.archived,
             },
         );
     }
