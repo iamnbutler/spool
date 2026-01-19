@@ -1,10 +1,11 @@
 [package]
 name = "spool"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.70"
 description = "Git-native, event-sourced task management"
 license = "MIT"
+repository = "https://github.com/iamnbutler/spool"
 keywords = ["task", "git", "event-sourcing", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 
