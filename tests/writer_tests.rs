@@ -5,7 +5,7 @@ use spool::context::SpoolContext;
 use spool::event::{Event, Operation};
 use spool::writer::{
     complete_task, create_task, get_current_branch, get_current_user, reopen_task, set_stream,
-    update_task, write_event,
+    update_task, write_event, CreateTaskParams,
 };
 
 fn setup_spool_dir(temp_dir: &TempDir) -> std::path::PathBuf {
@@ -96,12 +96,10 @@ fn test_create_task_returns_id() {
 
     let id = create_task(
         &ctx,
-        "Test task",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Test task",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
@@ -127,12 +125,14 @@ fn test_create_task_with_all_fields() {
 
     let id = create_task(
         &ctx,
-        "Full task",
-        Some("Task description"),
-        Some("p1"),
-        Some("@dev"),
-        vec!["bug".to_string(), "urgent".to_string()],
-        None,
+        CreateTaskParams {
+            title: "Full task",
+            description: Some("Task description"),
+            priority: Some("p1"),
+            assignee: Some("@dev"),
+            tags: vec!["bug".to_string(), "urgent".to_string()],
+            stream: None,
+        },
         "@tester",
         "feature-branch",
     )
@@ -304,36 +304,30 @@ fn test_create_task_generates_unique_ids() {
 
     let id1 = create_task(
         &ctx,
-        "Task 1",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Task 1",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
     .unwrap();
     let id2 = create_task(
         &ctx,
-        "Task 2",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Task 2",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
     .unwrap();
     let id3 = create_task(
         &ctx,
-        "Task 3",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Task 3",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
@@ -353,12 +347,10 @@ fn test_event_json_format() {
 
     create_task(
         &ctx,
-        "Test",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Test",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
@@ -388,12 +380,11 @@ fn test_create_task_with_stream() {
 
     let _id = create_task(
         &ctx,
-        "Task in stream",
-        None,
-        None,
-        None,
-        vec![],
-        Some("my-stream"),
+        CreateTaskParams {
+            title: "Task in stream",
+            stream: Some("my-stream"),
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
@@ -414,12 +405,10 @@ fn test_set_stream_writes_event() {
     // Create a task first
     let id = create_task(
         &ctx,
-        "Test task",
-        None,
-        None,
-        None,
-        vec![],
-        None,
+        CreateTaskParams {
+            title: "Test task",
+            ..Default::default()
+        },
         "@tester",
         "main",
     )
@@ -450,12 +439,11 @@ fn test_set_stream_to_none() {
 
     let id = create_task(
         &ctx,
-        "Test",
-        None,
-        None,
-        None,
-        vec![],
-        Some("old-stream"),
+        CreateTaskParams {
+            title: "Test",
+            stream: Some("old-stream"),
+            ..Default::default()
+        },
         "@tester",
         "main",
     )

@@ -11,9 +11,29 @@ use rustyline::{Config, Editor, Helper};
 use std::borrow::Cow;
 
 use crate::cli::{complete_task, list_tasks, reopen_task, show_task, update_task, OutputFormat};
+
+/// Parsed arguments for the add command
+struct AddArgs {
+    title: String,
+    description: Option<String>,
+    priority: Option<String>,
+    assignee: Option<String>,
+    tags: Vec<String>,
+    stream: Option<String>,
+}
+
+/// Parsed arguments for the list command
+struct ListArgs {
+    status: Option<String>,
+    assignee: Option<String>,
+    tag: Option<String>,
+    priority: Option<String>,
+    stream: Option<String>,
+    format: OutputFormat,
+}
 use crate::context::SpoolContext;
 use crate::state::load_or_materialize_state;
-use crate::writer::{create_task, get_current_branch, get_current_user};
+use crate::writer::{create_task, get_current_branch, get_current_user, CreateTaskParams};
 
 const COMMANDS: &[&str] = &[
     "add", "list", "show", "update", "complete", "reopen", "help", "quit", "exit",
@@ -239,17 +259,7 @@ fn shell_split(line: &str) -> Vec<String> {
     tokens
 }
 
-#[allow(clippy::type_complexity)]
-fn parse_add_args(
-    args: &[&str],
-) -> Result<(
-    String,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Vec<String>,
-    Option<String>,
-)> {
+fn parse_add_args(args: &[&str]) -> Result<AddArgs> {
     if args.is_empty() {
         return Err(anyhow!(
             "Usage: add <title> [-d description] [-p priority] [-a assignee] [-t tag...] [--stream name]"
@@ -309,21 +319,17 @@ fn parse_add_args(
         return Err(anyhow!("Task title is required"));
     }
 
-    let title = title_parts.join(" ");
-    Ok((title, description, priority, assignee, tags, stream))
+    Ok(AddArgs {
+        title: title_parts.join(" "),
+        description,
+        priority,
+        assignee,
+        tags,
+        stream,
+    })
 }
 
-#[allow(clippy::type_complexity)]
-fn parse_list_args(
-    args: &[&str],
-) -> (
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    OutputFormat,
-) {
+fn parse_list_args(args: &[&str]) -> ListArgs {
     let mut status = Some("open".to_string());
     let mut assignee = None;
     let mut tag = None;
@@ -375,7 +381,14 @@ fn parse_list_args(
         i += 1;
     }
 
-    (status, assignee, tag, priority, stream, format)
+    ListArgs {
+        status,
+        assignee,
+        tag,
+        priority,
+        stream,
+        format,
+    }
 }
 
 fn parse_show_args(args: &[&str]) -> Result<(String, bool)> {
@@ -452,33 +465,35 @@ fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
             return Ok(false); // Stop
         }
         "add" => {
-            let (title, description, priority, assignee, tags, stream) = parse_add_args(args)?;
+            let add_args = parse_add_args(args)?;
             let user = get_current_user()?;
             let branch = get_current_branch()?;
 
             let id = create_task(
                 ctx,
-                &title,
-                description.as_deref(),
-                priority.as_deref(),
-                assignee.as_deref(),
-                tags,
-                stream.as_deref(),
+                CreateTaskParams {
+                    title: &add_args.title,
+                    description: add_args.description.as_deref(),
+                    priority: add_args.priority.as_deref(),
+                    assignee: add_args.assignee.as_deref(),
+                    tags: add_args.tags,
+                    stream: add_args.stream.as_deref(),
+                },
                 &user,
                 &branch,
             )?;
             println!("Created task: {}", id);
         }
         "list" | "ls" => {
-            let (status, assignee, tag, priority, stream, format) = parse_list_args(args);
+            let list_args = parse_list_args(args);
             list_tasks(
                 ctx,
-                status.as_deref(),
-                assignee.as_deref(),
-                tag.as_deref(),
-                priority.as_deref(),
-                stream.as_deref(),
-                format,
+                list_args.status.as_deref(),
+                list_args.assignee.as_deref(),
+                list_args.tag.as_deref(),
+                list_args.priority.as_deref(),
+                list_args.stream.as_deref(),
+                list_args.format,
             )?;
         }
         "show" => {
@@ -642,29 +657,29 @@ mod tests {
     #[test]
     fn test_parse_add_args_basic() {
         let args: &[&str] = &["Task", "title", "-p", "1"];
-        let (title, desc, priority, assignee, tags, stream) = parse_add_args(args).unwrap();
-        assert_eq!(title, "Task title");
-        assert_eq!(priority, Some("1".to_string()));
-        assert!(desc.is_none());
-        assert!(assignee.is_none());
-        assert!(tags.is_empty());
-        assert!(stream.is_none());
+        let result = parse_add_args(args).unwrap();
+        assert_eq!(result.title, "Task title");
+        assert_eq!(result.priority, Some("1".to_string()));
+        assert!(result.description.is_none());
+        assert!(result.assignee.is_none());
+        assert!(result.tags.is_empty());
+        assert!(result.stream.is_none());
     }
 
     #[test]
     fn test_parse_add_args_with_description() {
         let args: &[&str] = &["Task", "-d", "A description", "-p", "2"];
-        let (title, desc, priority, _, _, _) = parse_add_args(args).unwrap();
-        assert_eq!(title, "Task");
-        assert_eq!(desc, Some("A description".to_string()));
-        assert_eq!(priority, Some("2".to_string()));
+        let result = parse_add_args(args).unwrap();
+        assert_eq!(result.title, "Task");
+        assert_eq!(result.description, Some("A description".to_string()));
+        assert_eq!(result.priority, Some("2".to_string()));
     }
 
     #[test]
     fn test_parse_add_args_with_stream() {
         let args: &[&str] = &["Task", "--stream", "my-stream"];
-        let (title, _, _, _, _, stream) = parse_add_args(args).unwrap();
-        assert_eq!(title, "Task");
-        assert_eq!(stream, Some("my-stream".to_string()));
+        let result = parse_add_args(args).unwrap();
+        assert_eq!(result.title, "Task");
+        assert_eq!(result.stream, Some("my-stream".to_string()));
     }
 }

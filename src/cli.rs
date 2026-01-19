@@ -7,6 +7,7 @@ use crate::state::{load_or_materialize_state, Task, TaskStatus};
 use crate::writer::{
     assign_task as write_assign, complete_task as write_complete, create_task as write_create,
     get_current_branch, get_current_user, reopen_task as write_reopen, update_task as write_update,
+    CreateTaskParams,
 };
 
 #[derive(Parser)]
@@ -408,12 +409,14 @@ pub fn add_task(
 
     let id = write_create(
         ctx,
-        title,
-        description,
-        priority,
-        assignee,
-        tags,
-        stream,
+        CreateTaskParams {
+            title,
+            description,
+            priority,
+            assignee,
+            tags,
+            stream,
+        },
         &user,
         &branch,
     )?;
