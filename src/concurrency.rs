@@ -111,7 +111,7 @@ pub fn get_task_version(ctx: &SpoolContext, task_id: &str) -> Result<Option<Vers
     match last_event {
         Some(event) => {
             let event_json = serde_json::to_string(&event)?;
-            let hash = format!("{:x}", md5_hash(&event_json));
+            let hash = format!("{:x}", simple_hash(&event_json));
             Ok(Some(Version {
                 seq: SEQUENCE.fetch_add(1, Ordering::SeqCst),
                 ts: event.ts.to_rfc3339(),
@@ -211,8 +211,8 @@ where
     }
 }
 
-/// Simple MD5 hash for version fingerprinting
-fn md5_hash(input: &str) -> u128 {
+/// Simple rolling hash for version fingerprinting
+fn simple_hash(input: &str) -> u128 {
     let mut hash: u128 = 0;
     for (i, byte) in input.bytes().enumerate() {
         hash = hash.wrapping_add((byte as u128).wrapping_mul((i as u128).wrapping_add(1)));

@@ -7,6 +7,7 @@ use std::io::{BufWriter, Write};
 use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 use crate::state::{materialize, Task, TaskStatus};
+use crate::writer::get_current_branch;
 
 pub fn archive_tasks(ctx: &SpoolContext, days: u32, dry_run: bool) -> Result<Vec<String>> {
     let state = materialize(ctx)?;
@@ -124,16 +125,4 @@ pub fn collect_all_events(ctx: &SpoolContext) -> Result<HashMap<String, Vec<Even
     }
 
     Ok(events_by_task)
-}
-
-fn get_current_branch() -> Result<String> {
-    let output = std::process::Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
-        .output()?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Ok("main".to_string())
-    }
 }

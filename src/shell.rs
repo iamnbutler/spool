@@ -656,8 +656,8 @@ mod tests {
 
     #[test]
     fn test_parse_add_args_basic() {
-        let args: &[&str] = &["Task", "title", "-p", "1"];
-        let result = parse_add_args(args).unwrap();
+        let input: &[&str] = &["Task", "title", "-p", "1"];
+        let result = parse_add_args(input).unwrap();
         assert_eq!(result.title, "Task title");
         assert_eq!(result.priority, Some("1".to_string()));
         assert!(result.description.is_none());
@@ -668,8 +668,8 @@ mod tests {
 
     #[test]
     fn test_parse_add_args_with_description() {
-        let args: &[&str] = &["Task", "-d", "A description", "-p", "2"];
-        let result = parse_add_args(args).unwrap();
+        let input: &[&str] = &["Task", "-d", "A description", "-p", "2"];
+        let result = parse_add_args(input).unwrap();
         assert_eq!(result.title, "Task");
         assert_eq!(result.description, Some("A description".to_string()));
         assert_eq!(result.priority, Some("2".to_string()));
@@ -677,8 +677,8 @@ mod tests {
 
     #[test]
     fn test_parse_add_args_with_stream() {
-        let args: &[&str] = &["Task", "--stream", "my-stream"];
-        let result = parse_add_args(args).unwrap();
+        let input: &[&str] = &["Task", "--stream", "my-stream"];
+        let result = parse_add_args(input).unwrap();
         assert_eq!(result.title, "Task");
         assert_eq!(result.stream, Some("my-stream".to_string()));
     }

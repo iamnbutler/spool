@@ -17,7 +17,6 @@ pub struct ValidationResult {
 pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
-    let mut seen_ids: HashSet<String> = HashSet::new();
     let mut created_ids: HashSet<String> = HashSet::new();
 
     // Validate event files
@@ -28,7 +27,6 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
             &filename,
             &mut errors,
             &mut warnings,
-            &mut seen_ids,
             &mut created_ids,
         )?;
     }
@@ -41,7 +39,6 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
             &filename,
             &mut errors,
             &mut warnings,
-            &mut seen_ids,
             &mut created_ids,
         )?;
     }
@@ -119,7 +116,6 @@ fn validate_event_file(
     filename: &str,
     errors: &mut Vec<String>,
     warnings: &mut Vec<String>,
-    _seen_ids: &mut HashSet<String>,
     created_ids: &mut HashSet<String>,
 ) -> Result<()> {
     let file = match File::open(path) {
