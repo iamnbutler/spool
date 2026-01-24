@@ -132,16 +132,44 @@ pub enum Commands {
         /// Task ID to claim
         id: String,
     },
-    /// Move a task to a stream (or remove from stream)
+    /// Manage streams (workstreams/projects)
     Stream {
-        /// Task ID to move
-        id: String,
-        /// Stream name (omit to remove from stream)
-        name: Option<String>,
+        #[command(subcommand)]
+        command: StreamCommands,
     },
     /// Unassign a task
     Free {
         /// Task ID to free
+        id: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum StreamCommands {
+    /// List all streams
+    List {
+        /// Output format: table, json, or ids
+        #[arg(short, long, default_value = "table")]
+        format: String,
+    },
+    /// Show details about a stream
+    Show {
+        /// Stream name
+        name: String,
+        /// Output format: table or json
+        #[arg(short, long, default_value = "table")]
+        format: String,
+    },
+    /// Add a task to a stream
+    Add {
+        /// Task ID to add to stream
+        id: String,
+        /// Stream name
+        name: String,
+    },
+    /// Remove a task from its stream
+    Remove {
+        /// Task ID to remove from stream
         id: String,
     },
 }
@@ -505,7 +533,7 @@ pub fn free_task(ctx: &SpoolContext, id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn stream_task(ctx: &SpoolContext, id: &str, stream: Option<&str>) -> Result<()> {
+pub fn stream_add(ctx: &SpoolContext, id: &str, stream: &str) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -517,11 +545,127 @@ pub fn stream_task(ctx: &SpoolContext, id: &str, stream: Option<&str>) -> Result
     let user = get_current_user()?;
     let branch = get_current_branch()?;
 
-    write_stream(ctx, id, stream, &user, &branch)?;
+    write_stream(ctx, id, Some(stream), &user, &branch)?;
+    println!("Added task {} to stream '{}'", id, stream);
 
-    match stream {
-        Some(s) => println!("Moved task {} to stream '{}'", id, s),
-        None => println!("Removed task {} from stream", id),
+    Ok(())
+}
+
+pub fn stream_remove(ctx: &SpoolContext, id: &str) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify task exists
+    state
+        .tasks
+        .get(id)
+        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_stream(ctx, id, None, &user, &branch)?;
+    println!("Removed task {} from stream", id);
+
+    Ok(())
+}
+
+pub fn stream_list(ctx: &SpoolContext, format: OutputFormat) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Collect all streams and their task counts
+    let mut stream_map: std::collections::HashMap<String, Vec<&Task>> =
+        std::collections::HashMap::new();
+
+    for task in state.tasks.values() {
+        if let Some(stream) = &task.stream {
+            stream_map
+                .entry(stream.clone())
+                .or_default()
+                .push(task);
+        }
+    }
+
+    let mut streams: Vec<_> = stream_map.keys().collect();
+    streams.sort();
+
+    match format {
+        OutputFormat::Json => {
+            let result: Vec<_> = streams
+                .iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "name": s,
+                        "task_count": stream_map[*s].len(),
+                    })
+                })
+                .collect();
+            let json = serde_json::to_string_pretty(&result)?;
+            println!("{}", json);
+        }
+        OutputFormat::Ids => {
+            for stream in &streams {
+                println!("{}", stream);
+            }
+        }
+        OutputFormat::Table => {
+            if streams.is_empty() {
+                println!("No streams found.");
+                return Ok(());
+            }
+
+            println!("{:<30} TASKS", "STREAM");
+            for stream in &streams {
+                println!("{:<30} {}", stream, stream_map[*stream].len());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn stream_show(ctx: &SpoolContext, name: &str, format: OutputFormat) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    let mut tasks: Vec<&Task> = state
+        .tasks
+        .values()
+        .filter(|t| t.stream.as_deref() == Some(name))
+        .collect();
+
+    tasks.sort_by_key(|t| t.created);
+
+    match format {
+        OutputFormat::Json => {
+            let json = serde_json::to_string_pretty(&tasks)?;
+            println!("{}", json);
+        }
+        OutputFormat::Ids => {
+            for task in &tasks {
+                println!("{}", task.id);
+            }
+        }
+        OutputFormat::Table => {
+            if tasks.is_empty() {
+                println!("No tasks found in stream '{}'.", name);
+                return Ok(());
+            }
+
+            println!("Stream: {}", name);
+            println!("{:<15} {:<10} {:<12} TITLE", "ID", "PRIORITY", "ASSIGNEE");
+            for task in &tasks {
+                let priority = task.priority.as_deref().unwrap_or("-");
+                let assignee = task.assignee.as_deref().unwrap_or("-");
+                let title = if task.title.len() > 50 {
+                    format!("{}...", &task.title[..47])
+                } else {
+                    task.title.clone()
+                };
+                println!(
+                    "{:<15} {:<10} {:<12} {}",
+                    task.id, priority, assignee, title
+                );
+            }
+        }
     }
 
     Ok(())

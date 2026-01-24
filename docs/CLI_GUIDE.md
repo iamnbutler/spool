@@ -60,10 +60,17 @@ After running `spool init`, your repository will contain:
 **Committed files:**
 - `events/*.jsonl` - Source of truth for all task data
 - `archive/*.jsonl` - Archived task events
+- `.version` - Schema version marker
 
 **Derived files (gitignored):**
 - `.index.json` - Maps task IDs to metadata for fast lookups
 - `.state.json` - Current snapshot of all tasks
+
+### Terminology
+
+- **Task**: A unit of work to be completed
+- **Stream**: A collection of related tasks, also known as a "workstream" or "project"
+- **Spool**: The overall system managing all tasks and streams
 
 ### Task Lifecycle
 
@@ -76,6 +83,8 @@ Create → Open → Complete → Archive
 ```
 
 ## Commands
+
+### Task Commands
 
 ### `spool init`
 
@@ -214,6 +223,92 @@ spool archive
 # Archive tasks completed more than 7 days ago
 spool archive --days 7
 ```
+
+### Stream Commands
+
+### `spool stream list`
+
+List all streams (workstreams/projects) with task counts.
+
+```bash
+spool stream list [OPTIONS]
+```
+
+**Options:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-f, --format` | Output format: `table`, `json`, or `ids` | `table` |
+
+**Examples:**
+
+```bash
+# List all streams
+spool stream list
+
+# List streams as JSON
+spool stream list --format json
+
+# Get just stream names for scripting
+spool stream list --format ids
+```
+
+### `spool stream show`
+
+Show all tasks in a specific stream.
+
+```bash
+spool stream show <name> [OPTIONS]
+```
+
+**Options:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-f, --format` | Output format: `table` or `json` | `table` |
+
+**Examples:**
+
+```bash
+# Show tasks in the 'api' stream
+spool stream show api
+
+# Show as JSON
+spool stream show api --format json
+```
+
+### `spool stream add`
+
+Add a task to a stream (workstream/project).
+
+```bash
+spool stream add <task-id> <stream-name>
+```
+
+**Examples:**
+
+```bash
+# Add task to 'backend' stream
+spool stream add task-abc123 backend
+
+# Add task to 'v2-migration' stream
+spool stream add k8b2x-a1c3 v2-migration
+```
+
+### `spool stream remove`
+
+Remove a task from its stream.
+
+```bash
+spool stream remove <task-id>
+```
+
+**Examples:**
+
+```bash
+# Remove task from stream
+spool stream remove task-abc123
+```
+
+### Other Commands
 
 ### `spool validate`
 

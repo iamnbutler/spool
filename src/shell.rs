@@ -57,8 +57,17 @@ Commands:
   update <task-id> [-t <title>] [-d <description>] [-p <priority>] [--stream <name>]
       Update a task's fields
 
-  stream <task-id> [<name>]
-      Move task to a stream (omit name to remove from stream)
+  stream list
+      List all streams
+  
+  stream show <name>
+      Show tasks in a stream
+  
+  stream add <task-id> <name>
+      Add task to a stream
+  
+  stream remove <task-id>
+      Remove task from stream
 
   complete <task-id> [-r <resolution>]
       Mark a task as complete (resolution: done, wontfix, duplicate, obsolete)
@@ -543,19 +552,50 @@ fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
         }
         "stream" => {
             if args.is_empty() {
-                return Err(anyhow!("Usage: stream <task-id> [<stream-name>]"));
+                return Err(anyhow!(
+                    "Usage: stream <subcommand>\n  Subcommands: list, show <name>, add <task-id> <name>, remove <task-id>"
+                ));
             }
-            let id = args[0];
-            let stream_name = args.get(1).copied();
-
-            let user = get_current_user()?;
-            let branch = get_current_branch()?;
-
-            set_stream(ctx, id, stream_name, &user, &branch)?;
-
-            match stream_name {
-                Some(s) => println!("Moved task {} to stream '{}'", id, s),
-                None => println!("Removed task {} from stream", id),
+            
+            match args[0] {
+                "list" => {
+                    use crate::cli::{stream_list, OutputFormat};
+                    stream_list(ctx, OutputFormat::Table)?;
+                }
+                "show" => {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Usage: stream show <name>"));
+                    }
+                    use crate::cli::{stream_show, OutputFormat};
+                    stream_show(ctx, args[1], OutputFormat::Table)?;
+                }
+                "add" => {
+                    if args.len() < 3 {
+                        return Err(anyhow!("Usage: stream add <task-id> <name>"));
+                    }
+                    let id = args[1];
+                    let name = args[2];
+                    let user = get_current_user()?;
+                    let branch = get_current_branch()?;
+                    set_stream(ctx, id, Some(name), &user, &branch)?;
+                    println!("Added task {} to stream '{}'", id, name);
+                }
+                "remove" => {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Usage: stream remove <task-id>"));
+                    }
+                    let id = args[1];
+                    let user = get_current_user()?;
+                    let branch = get_current_branch()?;
+                    set_stream(ctx, id, None, &user, &branch)?;
+                    println!("Removed task {} from stream", id);
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "Unknown stream subcommand: {}\nAvailable: list, show, add, remove",
+                        args[0]
+                    ));
+                }
             }
         }
         "complete" | "done" | "close" => {

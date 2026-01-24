@@ -11,6 +11,8 @@ fn setup_initialized_spool(temp_dir: &TempDir) {
     let spool_dir = temp_dir.path().join(".spool");
     fs::create_dir_all(spool_dir.join("events")).unwrap();
     fs::create_dir_all(spool_dir.join("archive")).unwrap();
+    // Write version file to avoid migration messages in tests
+    fs::write(spool_dir.join(".version"), "0.4.0").unwrap();
 }
 
 fn write_test_events(temp_dir: &TempDir, events: &str) {
@@ -575,4 +577,169 @@ fn test_free_task_not_found() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn test_stream_list_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Task without stream"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No streams found"));
+}
+
+#[test]
+fn test_stream_list_shows_streams() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"API task","stream":"api"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Frontend task","stream":"frontend"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-003","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"title":"Another API task","stream":"api"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("api"))
+        .stdout(predicate::str::contains("frontend"))
+        .stdout(predicate::str::contains("2")) // api has 2 tasks
+        .stdout(predicate::str::contains("1")); // frontend has 1 task
+}
+
+#[test]
+fn test_stream_show() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"API task","stream":"api"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Frontend task","stream":"frontend"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", "api"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stream: api"))
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("API task"))
+        .stdout(predicate::str::contains("task-002").not());
+}
+
+#[test]
+fn test_stream_show_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Task without stream"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", "nonexistent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No tasks found in stream"));
+}
+
+#[test]
+fn test_stream_add() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Task without stream"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "task-001", "backend"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Added task task-001 to stream 'backend'"));
+
+    // Verify it was added
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", "backend"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"));
+}
+
+#[test]
+fn test_stream_remove() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Task in stream","stream":"api"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "remove", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Removed task task-001 from stream"));
+
+    // Verify it was removed
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No streams found"));
+}
+
+#[test]
+fn test_migration_creates_version_file() {
+    let temp_dir = TempDir::new().unwrap();
+    
+    // Manually setup without version file to simulate old spool
+    let spool_dir = temp_dir.path().join(".spool");
+    fs::create_dir_all(spool_dir.join("events")).unwrap();
+    fs::create_dir_all(spool_dir.join("archive")).unwrap();
+    // DON'T write .version file to simulate 0.3.1
+    
+    // Add some events to simulate existing data
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old task"}}"#,
+    );
+
+    // Run any command - this should trigger migration
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Migrating spool from version 0.3.1 to 0.4.0"));
+
+    // Check that version file was created
+    let version_file = temp_dir.path().join(".spool/.version");
+    assert!(version_file.exists());
+    let version_content = fs::read_to_string(&version_file).unwrap();
+    assert_eq!(version_content.trim(), "0.4.0");
 }

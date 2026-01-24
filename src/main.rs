@@ -4,9 +4,11 @@ use clap::Parser;
 use spool::archive::archive_tasks;
 use spool::cli::{
     add_task, assign_task, claim_task, complete_task, free_task, list_tasks, reopen_task,
-    show_task, stream_task, update_task, Cli, Commands, OutputFormat,
+    show_task, stream_add, stream_list, stream_remove, stream_show, update_task, Cli, Commands,
+    OutputFormat, StreamCommands,
 };
 use spool::context::{init, SpoolContext};
+use spool::migration::check_and_migrate;
 use spool::shell::run_shell;
 use spool::state::rebuild;
 use spool::validation::validate;
@@ -16,6 +18,18 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Init => init(),
+        _ => {
+            // For all non-init commands, run migration check first
+            let ctx = SpoolContext::discover()?;
+            check_and_migrate(&ctx)?;
+            run_command(cli.command, ctx)
+        }
+    }
+}
+
+fn run_command(command: Commands, ctx: SpoolContext) -> Result<()> {
+    match command {
+        Commands::Init => unreachable!("Init handled above"),
         Commands::Add {
             title,
             description,
@@ -24,7 +38,6 @@ fn main() -> Result<()> {
             tag,
             stream,
         } => {
-            let ctx = SpoolContext::discover()?;
             add_task(
                 &ctx,
                 &title,
@@ -43,7 +56,6 @@ fn main() -> Result<()> {
             stream,
             format,
         } => {
-            let ctx = SpoolContext::discover()?;
             let fmt = OutputFormat::from_str(&format);
             list_tasks(
                 &ctx,
@@ -56,33 +68,26 @@ fn main() -> Result<()> {
             )
         }
         Commands::Show { id, events } => {
-            let ctx = SpoolContext::discover()?;
             show_task(&ctx, &id, events)
         }
         Commands::Rebuild => {
-            let ctx = SpoolContext::discover()?;
             rebuild(&ctx)
         }
         Commands::Archive { days, dry_run } => {
-            let ctx = SpoolContext::discover()?;
             archive_tasks(&ctx, days, dry_run)?;
             Ok(())
         }
         Commands::Validate { strict } => {
-            let ctx = SpoolContext::discover()?;
             validate(&ctx, strict)?;
             Ok(())
         }
         Commands::Shell => {
-            let ctx = SpoolContext::discover()?;
             run_shell(ctx)
         }
         Commands::Complete { id, resolution } => {
-            let ctx = SpoolContext::discover()?;
             complete_task(&ctx, &id, Some(&resolution))
         }
         Commands::Reopen { id } => {
-            let ctx = SpoolContext::discover()?;
             reopen_task(&ctx, &id)
         }
         Commands::Update {
@@ -92,7 +97,6 @@ fn main() -> Result<()> {
             priority,
             stream,
         } => {
-            let ctx = SpoolContext::discover()?;
             update_task(
                 &ctx,
                 &id,
@@ -103,20 +107,29 @@ fn main() -> Result<()> {
             )
         }
         Commands::Assign { id, assignee } => {
-            let ctx = SpoolContext::discover()?;
             assign_task(&ctx, &id, &assignee)
         }
         Commands::Claim { id } => {
-            let ctx = SpoolContext::discover()?;
             claim_task(&ctx, &id)
         }
         Commands::Free { id } => {
-            let ctx = SpoolContext::discover()?;
             free_task(&ctx, &id)
         }
-        Commands::Stream { id, name } => {
-            let ctx = SpoolContext::discover()?;
-            stream_task(&ctx, &id, name.as_deref())
-        }
+        Commands::Stream { command } => match command {
+            StreamCommands::List { format } => {
+                let fmt = OutputFormat::from_str(&format);
+                stream_list(&ctx, fmt)
+            }
+            StreamCommands::Show { name, format } => {
+                let fmt = OutputFormat::from_str(&format);
+                stream_show(&ctx, &name, fmt)
+            }
+            StreamCommands::Add { id, name } => {
+                stream_add(&ctx, &id, &name)
+            }
+            StreamCommands::Remove { id } => {
+                stream_remove(&ctx, &id)
+            }
+        },
     }
 }

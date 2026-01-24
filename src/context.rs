@@ -44,6 +44,10 @@ impl SpoolContext {
         self.root.join(".state.json")
     }
 
+    pub fn version_path(&self) -> PathBuf {
+        self.root.join(".version")
+    }
+
     pub fn get_event_files(&self) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
         if self.events_dir.is_dir() {
@@ -116,10 +120,14 @@ pub fn init() -> Result<()> {
 "#;
     fs::write(spool_dir.join(".gitignore"), gitignore)?;
 
+    // Write initial version file
+    fs::write(spool_dir.join(".version"), "0.4.0")?;
+
     println!("Created .spool/");
     println!("  .spool/events/     - Daily event logs");
     println!("  .spool/archive/    - Monthly rollups");
     println!("  .spool/.gitignore  - Ignores derived files");
+    println!("  .spool/.version    - Schema version marker");
 
     Ok(())
 }

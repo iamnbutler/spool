@@ -4,6 +4,7 @@ pub mod concurrency;
 pub mod context;
 pub mod event;
 pub mod id;
+pub mod migration;
 pub mod shell;
 pub mod state;
 pub mod validation;
