@@ -210,6 +210,7 @@ impl OutputFormat {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn list_tasks(
     ctx: &SpoolContext,
     status_filter: Option<&str>,
