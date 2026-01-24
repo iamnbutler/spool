@@ -252,3 +252,89 @@ pub fn get_current_user() -> Result<String> {
 
     Ok("@unknown".to_string())
 }
+
+/// Create a new stream and return its ID
+pub fn create_stream(
+    ctx: &SpoolContext,
+    name: &str,
+    description: Option<&str>,
+    by: &str,
+    branch: &str,
+) -> Result<String> {
+    let id = generate_id();
+
+    let mut d = serde_json::json!({
+        "name": name,
+    });
+
+    if let Some(desc) = description {
+        d["description"] = serde_json::Value::String(desc.to_string());
+    }
+
+    let event = Event {
+        v: 1,
+        op: Operation::CreateStream,
+        id: id.clone(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d,
+    };
+
+    write_event(ctx, &event)?;
+
+    Ok(id)
+}
+
+/// Update a stream's metadata
+pub fn update_stream(
+    ctx: &SpoolContext,
+    id: &str,
+    name: Option<&str>,
+    description: Option<&str>,
+    by: &str,
+    branch: &str,
+) -> Result<()> {
+    let mut d = serde_json::Map::new();
+
+    if let Some(n) = name {
+        d.insert("name".to_string(), serde_json::Value::String(n.to_string()));
+    }
+    if let Some(desc) = description {
+        d.insert(
+            "description".to_string(),
+            serde_json::Value::String(desc.to_string()),
+        );
+    }
+
+    if d.is_empty() {
+        return Err(anyhow::anyhow!("No fields to update"));
+    }
+
+    let event = Event {
+        v: 1,
+        op: Operation::UpdateStream,
+        id: id.to_string(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d: serde_json::Value::Object(d),
+    };
+
+    write_event(ctx, &event)
+}
+
+/// Delete a stream
+pub fn delete_stream(ctx: &SpoolContext, id: &str, by: &str, branch: &str) -> Result<()> {
+    let event = Event {
+        v: 1,
+        op: Operation::DeleteStream,
+        id: id.to_string(),
+        ts: Utc::now(),
+        by: by.to_string(),
+        branch: branch.to_string(),
+        d: serde_json::json!({}),
+    };
+
+    write_event(ctx, &event)
+}

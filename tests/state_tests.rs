@@ -510,3 +510,126 @@ fn test_state_materialization_set_stream_to_none() {
     let task = state.tasks.get("task-1").unwrap();
     assert!(task.stream.is_none());
 }
+
+// Stream entity tests
+
+#[test]
+fn test_state_materialization_create_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+
+    let events = vec![json!({
+        "v": 1, "op": "create_stream", "id": "stream-001",
+        "ts": "2024-01-15T10:00:00Z", "by": "@tester", "branch": "main",
+        "d": {"name": "Project Alpha", "description": "Main project"}
+    })];
+
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
+
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
+
+    assert_eq!(state.streams.len(), 1);
+    let stream = state.streams.get("stream-001").unwrap();
+    assert_eq!(stream.id, "stream-001");
+    assert_eq!(stream.name, "Project Alpha");
+    assert_eq!(stream.description.as_deref(), Some("Main project"));
+    assert_eq!(stream.created_by, "@tester");
+}
+
+#[test]
+fn test_state_materialization_update_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+
+    let events = vec![
+        json!({
+            "v": 1, "op": "create_stream", "id": "stream-002",
+            "ts": "2024-01-15T10:00:00Z", "by": "@tester", "branch": "main",
+            "d": {"name": "Original Name"}
+        }),
+        json!({
+            "v": 1, "op": "update_stream", "id": "stream-002",
+            "ts": "2024-01-15T11:00:00Z", "by": "@tester", "branch": "main",
+            "d": {"name": "Updated Name", "description": "New description"}
+        }),
+    ];
+
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
+
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
+
+    let stream = state.streams.get("stream-002").unwrap();
+    assert_eq!(stream.name, "Updated Name");
+    assert_eq!(stream.description.as_deref(), Some("New description"));
+}
+
+#[test]
+fn test_state_materialization_delete_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+
+    let events = vec![
+        json!({
+            "v": 1, "op": "create_stream", "id": "stream-003",
+            "ts": "2024-01-15T10:00:00Z", "by": "@tester", "branch": "main",
+            "d": {"name": "To Delete"}
+        }),
+        json!({
+            "v": 1, "op": "delete_stream", "id": "stream-003",
+            "ts": "2024-01-15T11:00:00Z", "by": "@tester", "branch": "main",
+            "d": {}
+        }),
+    ];
+
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
+
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
+
+    assert_eq!(state.streams.len(), 0);
+    assert!(!state.streams.contains_key("stream-003"));
+}
+
+#[test]
+fn test_state_materialization_streams_and_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+
+    let events = vec![
+        json!({
+            "v": 1, "op": "create_stream", "id": "stream-backend",
+            "ts": "2024-01-15T10:00:00Z", "by": "@tester", "branch": "main",
+            "d": {"name": "Backend"}
+        }),
+        json!({
+            "v": 1, "op": "create", "id": "task-1",
+            "ts": "2024-01-15T10:01:00Z", "by": "@tester", "branch": "main",
+            "d": {"title": "Task 1", "stream": "stream-backend"}
+        }),
+        json!({
+            "v": 1, "op": "create", "id": "task-2",
+            "ts": "2024-01-15T10:02:00Z", "by": "@tester", "branch": "main",
+            "d": {"title": "Task 2", "stream": "stream-backend"}
+        }),
+    ];
+
+    write_events(&spool_dir.join("events"), "2024-01-15.jsonl", &events);
+
+    let ctx = create_test_context(&spool_dir);
+    let state = spool::state::materialize(&ctx).unwrap();
+
+    assert_eq!(state.streams.len(), 1);
+    assert_eq!(state.tasks.len(), 2);
+
+    // Both tasks should reference the stream
+    assert_eq!(
+        state.tasks.get("task-1").unwrap().stream.as_deref(),
+        Some("stream-backend")
+    );
+    assert_eq!(
+        state.tasks.get("task-2").unwrap().stream.as_deref(),
+        Some("stream-backend")
+    );
+}

@@ -3,8 +3,9 @@ use clap::Parser;
 
 use spool::archive::archive_tasks;
 use spool::cli::{
-    add_task, assign_task, claim_task, complete_task, free_task, list_tasks, reopen_task,
-    show_task, stream_task, update_task, Cli, Commands, OutputFormat,
+    add_stream, add_task, assign_task, claim_task, complete_task, delete_stream, free_task,
+    list_streams, list_tasks, reopen_task, show_stream, show_task, update_stream_cmd, update_task,
+    Cli, Commands, OutputFormat, StreamCommands,
 };
 use spool::context::{init, SpoolContext};
 use spool::shell::run_shell;
@@ -41,6 +42,7 @@ fn main() -> Result<()> {
             tag,
             priority,
             stream,
+            no_stream,
             format,
         } => {
             let ctx = SpoolContext::discover()?;
@@ -52,6 +54,7 @@ fn main() -> Result<()> {
                 tag.as_deref(),
                 priority.as_deref(),
                 stream.as_deref(),
+                no_stream,
                 fmt,
             )
         }
@@ -114,9 +117,26 @@ fn main() -> Result<()> {
             let ctx = SpoolContext::discover()?;
             free_task(&ctx, &id)
         }
-        Commands::Stream { id, name } => {
+        Commands::Stream { command } => {
             let ctx = SpoolContext::discover()?;
-            stream_task(&ctx, &id, name.as_deref())
+            match command {
+                StreamCommands::Add { name, description } => {
+                    add_stream(&ctx, &name, description.as_deref())
+                }
+                StreamCommands::List { format } => {
+                    let fmt = OutputFormat::from_str(&format);
+                    list_streams(&ctx, fmt)
+                }
+                StreamCommands::Show { id, name } => {
+                    show_stream(&ctx, id.as_deref(), name.as_deref())
+                }
+                StreamCommands::Update {
+                    id,
+                    name,
+                    description,
+                } => update_stream_cmd(&ctx, &id, name.as_deref(), description.as_deref()),
+                StreamCommands::Delete { id } => delete_stream(&ctx, &id),
+            }
         }
     }
 }

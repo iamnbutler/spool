@@ -5,8 +5,10 @@ use crate::archive::collect_all_events;
 use crate::context::SpoolContext;
 use crate::state::{load_or_materialize_state, Task, TaskStatus};
 use crate::writer::{
-    assign_task as write_assign, complete_task as write_complete, create_task as write_create,
-    get_current_branch, get_current_user, reopen_task as write_reopen, set_stream as write_stream,
+    assign_task as write_assign, complete_task as write_complete,
+    create_stream as write_create_stream, create_task as write_create,
+    delete_stream as write_delete_stream, get_current_branch, get_current_user,
+    reopen_task as write_reopen, set_stream as write_stream, update_stream as write_update_stream,
     update_task as write_update, CreateTaskParams,
 };
 
@@ -59,6 +61,9 @@ pub enum Commands {
         /// Filter by stream
         #[arg(long)]
         stream: Option<String>,
+        /// Show only tasks without a stream
+        #[arg(long)]
+        no_stream: bool,
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table")]
         format: String,
@@ -132,16 +137,57 @@ pub enum Commands {
         /// Task ID to claim
         id: String,
     },
-    /// Move a task to a stream (or remove from stream)
+    /// Manage streams (workstreams/projects)
     Stream {
-        /// Task ID to move
-        id: String,
-        /// Stream name (omit to remove from stream)
-        name: Option<String>,
+        #[command(subcommand)]
+        command: StreamCommands,
     },
     /// Unassign a task
     Free {
         /// Task ID to free
+        id: String,
+    },
+}
+
+/// Stream subcommands for managing workstreams/projects
+#[derive(Subcommand)]
+pub enum StreamCommands {
+    /// Create a new stream
+    Add {
+        /// Stream name
+        name: String,
+        /// Stream description
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+    /// List all streams
+    List {
+        /// Output format: table, json, or ids
+        #[arg(short, long, default_value = "table")]
+        format: String,
+    },
+    /// Show details of a stream and its tasks
+    Show {
+        /// Stream ID
+        id: Option<String>,
+        /// Stream name (alternative to ID)
+        #[arg(short, long)]
+        name: Option<String>,
+    },
+    /// Update stream metadata
+    Update {
+        /// Stream ID
+        id: String,
+        /// New name
+        #[arg(short, long)]
+        name: Option<String>,
+        /// New description
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+    /// Delete a stream (must have no tasks assigned)
+    Delete {
+        /// Stream ID
         id: String,
     },
 }
@@ -164,6 +210,7 @@ impl OutputFormat {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn list_tasks(
     ctx: &SpoolContext,
     status_filter: Option<&str>,
@@ -171,6 +218,7 @@ pub fn list_tasks(
     tag: Option<&str>,
     priority: Option<&str>,
     stream: Option<&str>,
+    no_stream: bool,
     format: OutputFormat,
 ) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
@@ -200,10 +248,14 @@ pub fn list_tasks(
                 .map(|p| t.priority.as_deref() == Some(p))
                 .unwrap_or(true);
 
-            // Stream filter
-            let stream_match = stream
-                .map(|s| t.stream.as_deref() == Some(s))
-                .unwrap_or(true);
+            // Stream filter (--stream and --no-stream are mutually exclusive)
+            let stream_match = if no_stream {
+                t.stream.is_none()
+            } else {
+                stream
+                    .map(|s| t.stream.as_deref() == Some(s))
+                    .unwrap_or(true)
+            };
 
             status_match && assignee_match && tag_match && priority_match && stream_match
         })
@@ -389,6 +441,16 @@ pub fn update_task(
         .get(id)
         .ok_or_else(|| anyhow!("Task not found: {}", id))?;
 
+    // If setting a stream, verify it exists
+    if let Some(s) = stream {
+        if !s.is_empty() && !state.streams.contains_key(s) {
+            return Err(anyhow!(
+                "Stream not found: {}. Use 'spool stream add' to create it first.",
+                s
+            ));
+        }
+    }
+
     let user = get_current_user()?;
     let branch = get_current_branch()?;
 
@@ -430,6 +492,17 @@ pub fn add_task(
     tags: Vec<String>,
     stream: Option<&str>,
 ) -> Result<()> {
+    // If setting a stream, verify it exists
+    if let Some(s) = stream {
+        let state = load_or_materialize_state(ctx)?;
+        if !state.streams.contains_key(s) {
+            return Err(anyhow!(
+                "Stream not found: {}. Use 'spool stream add' to create it first.",
+                s
+            ));
+        }
+    }
+
     let user = get_current_user()?;
     let branch = get_current_branch()?;
 
@@ -505,23 +578,233 @@ pub fn free_task(ctx: &SpoolContext, id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn stream_task(ctx: &SpoolContext, id: &str, stream: Option<&str>) -> Result<()> {
+/// Create a new stream
+pub fn add_stream(ctx: &SpoolContext, name: &str, description: Option<&str>) -> Result<()> {
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    let id = write_create_stream(ctx, name, description, &user, &branch)?;
+    println!("Created stream: {} ({})", name, id);
+
+    Ok(())
+}
+
+/// List all streams
+pub fn list_streams(ctx: &SpoolContext, format: OutputFormat) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    let mut streams: Vec<_> = state.streams.values().collect();
+    streams.sort_by_key(|s| &s.created);
+
+    // Count tasks per stream
+    let mut task_counts: std::collections::HashMap<&str, (usize, usize)> =
+        std::collections::HashMap::new();
+    for task in state.tasks.values() {
+        if let Some(stream_id) = &task.stream {
+            let entry = task_counts.entry(stream_id.as_str()).or_insert((0, 0));
+            if task.status == TaskStatus::Open {
+                entry.0 += 1;
+            } else {
+                entry.1 += 1;
+            }
+        }
+    }
+
+    match format {
+        OutputFormat::Json => {
+            let json = serde_json::to_string_pretty(&streams)?;
+            println!("{}", json);
+        }
+        OutputFormat::Ids => {
+            for stream in &streams {
+                println!("{}", stream.id);
+            }
+        }
+        OutputFormat::Table => {
+            if streams.is_empty() {
+                println!("No streams found.");
+                return Ok(());
+            }
+
+            println!(
+                "{:<15} {:<20} {:<10} {:<10}",
+                "ID", "NAME", "OPEN", "COMPLETE"
+            );
+            for stream in &streams {
+                let (open, complete) = task_counts
+                    .get(stream.id.as_str())
+                    .copied()
+                    .unwrap_or((0, 0));
+                let name = if stream.name.len() > 18 {
+                    format!("{}...", &stream.name[..15])
+                } else {
+                    stream.name.clone()
+                };
+                println!(
+                    "{:<15} {:<20} {:<10} {:<10}",
+                    stream.id, name, open, complete
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Show details of a stream and its tasks
+pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Find stream by ID or name
+    let stream = match (id, name) {
+        (Some(id), _) => state
+            .streams
+            .get(id)
+            .ok_or_else(|| anyhow!("Stream not found: {}", id))?,
+        (None, Some(name)) => state
+            .streams
+            .values()
+            .find(|s| s.name == name)
+            .ok_or_else(|| anyhow!("Stream not found with name: {}", name))?,
+        (None, None) => return Err(anyhow!("Either stream ID or --name must be provided")),
+    };
+    let stream_id = &stream.id;
+
+    println!("ID:          {}", stream.id);
+    println!("Name:        {}", stream.name);
+    if let Some(d) = &stream.description {
+        println!("Description: {}", d);
+    }
+    println!("Created:     {} by {}", stream.created, stream.created_by);
+
+    // Find tasks in this stream
+    let mut tasks: Vec<&Task> = state
+        .tasks
+        .values()
+        .filter(|t| t.stream.as_deref() == Some(stream_id.as_str()))
+        .collect();
+    tasks.sort_by_key(|t| t.created);
+
+    let open_count = tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Open)
+        .count();
+    let complete_count = tasks.len() - open_count;
+
+    println!("\nTasks: {} open, {} complete", open_count, complete_count);
+
+    if !tasks.is_empty() {
+        println!("\n{:<15} {:<10} {:<10} TITLE", "ID", "STATUS", "PRIORITY");
+        for task in &tasks {
+            let status = match task.status {
+                TaskStatus::Open => "open",
+                TaskStatus::Complete => "complete",
+            };
+            let priority = task.priority.as_deref().unwrap_or("-");
+            let title = if task.title.len() > 40 {
+                format!("{}...", &task.title[..37])
+            } else {
+                task.title.clone()
+            };
+            println!("{:<15} {:<10} {:<10} {}", task.id, status, priority, title);
+        }
+    }
+
+    Ok(())
+}
+
+/// Update stream metadata
+pub fn update_stream_cmd(
+    ctx: &SpoolContext,
+    id: &str,
+    name: Option<&str>,
+    description: Option<&str>,
+) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify stream exists
+    state
+        .streams
+        .get(id)
+        .ok_or_else(|| anyhow!("Stream not found: {}", id))?;
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_update_stream(ctx, id, name, description, &user, &branch)?;
+
+    let mut updates = Vec::new();
+    if name.is_some() {
+        updates.push("name");
+    }
+    if description.is_some() {
+        updates.push("description");
+    }
+    println!("Updated stream {}: {}", id, updates.join(", "));
+
+    Ok(())
+}
+
+/// Delete a stream
+pub fn delete_stream(ctx: &SpoolContext, id: &str) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Verify stream exists
+    let stream = state
+        .streams
+        .get(id)
+        .ok_or_else(|| anyhow!("Stream not found: {}", id))?;
+
+    // Check if any tasks are assigned to this stream
+    let task_count = state
+        .tasks
+        .values()
+        .filter(|t| t.stream.as_deref() == Some(id))
+        .count();
+
+    if task_count > 0 {
+        return Err(anyhow!(
+            "Cannot delete stream '{}': {} tasks are still assigned. Move or remove tasks first.",
+            stream.name,
+            task_count
+        ));
+    }
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    write_delete_stream(ctx, id, &user, &branch)?;
+    println!("Deleted stream: {} ({})", stream.name, id);
+
+    Ok(())
+}
+
+/// Set a task's stream (used by update command)
+pub fn set_task_stream(ctx: &SpoolContext, task_id: &str, stream_id: Option<&str>) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
     state
         .tasks
-        .get(id)
-        .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+        .get(task_id)
+        .ok_or_else(|| anyhow!("Task not found: {}", task_id))?;
+
+    // If setting to a stream, verify it exists
+    if let Some(sid) = stream_id {
+        state
+            .streams
+            .get(sid)
+            .ok_or_else(|| anyhow!("Stream not found: {}", sid))?;
+    }
 
     let user = get_current_user()?;
     let branch = get_current_branch()?;
 
-    write_stream(ctx, id, stream, &user, &branch)?;
+    write_stream(ctx, task_id, stream_id, &user, &branch)?;
 
-    match stream {
-        Some(s) => println!("Moved task {} to stream '{}'", id, s),
-        None => println!("Removed task {} from stream", id),
+    match stream_id {
+        Some(s) => println!("Moved task {} to stream {}", task_id, s),
+        None => println!("Removed task {} from stream", task_id),
     }
 
     Ok(())

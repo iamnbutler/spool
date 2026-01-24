@@ -59,6 +59,17 @@ pub struct Comment {
     pub r#ref: Option<String>,
 }
 
+/// A stream is a collection of tasks representing a project or workstream
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stream {
+    pub id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub created: DateTime<Utc>,
+    pub created_by: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Index {
     pub tasks: HashMap<String, TaskIndex>,
@@ -80,37 +91,49 @@ pub struct TaskIndex {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {
     pub tasks: HashMap<String, Task>,
+    #[serde(default)]
+    pub streams: HashMap<String, Stream>,
     pub rebuilt: DateTime<Utc>,
 }
 
 pub fn materialize(ctx: &SpoolContext) -> Result<State> {
     let mut tasks: HashMap<String, Task> = HashMap::new();
+    let mut streams: HashMap<String, Stream> = HashMap::new();
 
     // First process archive files
     for file in ctx.get_archive_files()? {
         let events = ctx.parse_events_from_file(&file)?;
-        apply_events(&mut tasks, events);
+        apply_events(&mut tasks, &mut streams, events);
     }
 
     // Then process event files (in chronological order)
     for file in ctx.get_event_files()? {
         let events = ctx.parse_events_from_file(&file)?;
-        apply_events(&mut tasks, events);
+        apply_events(&mut tasks, &mut streams, events);
     }
 
     Ok(State {
         tasks,
+        streams,
         rebuilt: Utc::now(),
     })
 }
 
-fn apply_events(tasks: &mut HashMap<String, Task>, events: Vec<Event>) {
+fn apply_events(
+    tasks: &mut HashMap<String, Task>,
+    streams: &mut HashMap<String, Stream>,
+    events: Vec<Event>,
+) {
     for event in events {
-        apply_event(tasks, event);
+        apply_event(tasks, streams, event);
     }
 }
 
-fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
+fn apply_event(
+    tasks: &mut HashMap<String, Task>,
+    streams: &mut HashMap<String, Stream>,
+    event: Event,
+) {
     match event.op {
         Operation::Create => {
             let d = &event.d;
@@ -306,6 +329,38 @@ fn apply_event(tasks: &mut HashMap<String, Task>, event: Event) {
                 task.updated = event.ts;
             }
         }
+        Operation::CreateStream => {
+            let d = &event.d;
+            let stream = Stream {
+                id: event.id.clone(),
+                name: d
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                description: d
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .map(String::from),
+                created: event.ts,
+                created_by: event.by.clone(),
+            };
+            streams.insert(event.id, stream);
+        }
+        Operation::UpdateStream => {
+            if let Some(stream) = streams.get_mut(&event.id) {
+                let d = &event.d;
+                if let Some(name) = d.get("name").and_then(|v| v.as_str()) {
+                    stream.name = name.to_string();
+                }
+                if let Some(desc) = d.get("description").and_then(|v| v.as_str()) {
+                    stream.description = Some(desc.to_string());
+                }
+            }
+        }
+        Operation::DeleteStream => {
+            streams.remove(&event.id);
+        }
     }
 }
 
@@ -431,7 +486,11 @@ pub fn rebuild(ctx: &SpoolContext) -> Result<()> {
     let state = materialize(ctx)?;
     let state_json = serde_json::to_string_pretty(&state)?;
     fs::write(ctx.state_path(), state_json)?;
-    println!("  Wrote .state.json ({} tasks)", state.tasks.len());
+    println!(
+        "  Wrote .state.json ({} tasks, {} streams)",
+        state.tasks.len(),
+        state.streams.len()
+    );
 
     println!("Rebuild complete.");
     Ok(())

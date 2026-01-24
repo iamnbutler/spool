@@ -4,8 +4,8 @@ use tempfile::TempDir;
 use spool::context::SpoolContext;
 use spool::event::{Event, Operation};
 use spool::writer::{
-    complete_task, create_task, get_current_branch, get_current_user, reopen_task, set_stream,
-    update_task, write_event, CreateTaskParams,
+    complete_task, create_stream, create_task, delete_stream, get_current_branch, get_current_user,
+    reopen_task, set_stream, update_stream, update_task, write_event, CreateTaskParams,
 };
 
 fn setup_spool_dir(temp_dir: &TempDir) -> std::path::PathBuf {
@@ -459,4 +459,123 @@ fn test_set_stream_to_none() {
     let set_stream_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(set_stream_event["op"], "set_stream");
     assert!(set_stream_event["d"]["stream"].is_null());
+}
+
+// Stream writer tests
+
+#[test]
+fn test_create_stream_returns_id() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
+
+    let id = create_stream(&ctx, "My Project", None, "@tester", "main").unwrap();
+
+    // ID should be non-empty
+    assert!(!id.is_empty());
+
+    // Verify event was written
+    let event_files = ctx.get_event_files().unwrap();
+    assert_eq!(event_files.len(), 1);
+
+    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let event: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+
+    assert_eq!(event["op"], "create_stream");
+    assert_eq!(event["id"], id);
+    assert_eq!(event["d"]["name"], "My Project");
+}
+
+#[test]
+fn test_create_stream_with_description() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
+
+    let id = create_stream(
+        &ctx,
+        "Backend",
+        Some("Backend development tasks"),
+        "@tester",
+        "main",
+    )
+    .unwrap();
+
+    let event_files = ctx.get_event_files().unwrap();
+    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let event: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+
+    assert_eq!(event["op"], "create_stream");
+    assert_eq!(event["id"], id);
+    assert_eq!(event["d"]["name"], "Backend");
+    assert_eq!(event["d"]["description"], "Backend development tasks");
+}
+
+#[test]
+fn test_update_stream_writes_event() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
+
+    // Create a stream first
+    let id = create_stream(&ctx, "Original Name", None, "@tester", "main").unwrap();
+
+    // Update it
+    update_stream(
+        &ctx,
+        &id,
+        Some("New Name"),
+        Some("Updated description"),
+        "@tester",
+        "main",
+    )
+    .unwrap();
+
+    let event_files = ctx.get_event_files().unwrap();
+    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let lines: Vec<&str> = content.lines().collect();
+    assert_eq!(lines.len(), 2);
+
+    let update_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    assert_eq!(update_event["op"], "update_stream");
+    assert_eq!(update_event["id"], id);
+    assert_eq!(update_event["d"]["name"], "New Name");
+    assert_eq!(update_event["d"]["description"], "Updated description");
+}
+
+#[test]
+fn test_update_stream_no_fields_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
+
+    let result = update_stream(&ctx, "stream-001", None, None, "@tester", "main");
+
+    assert!(result.is_err());
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("No fields to update"));
+}
+
+#[test]
+fn test_delete_stream_writes_event() {
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+    let ctx = create_test_context(&spool_dir);
+
+    // Create a stream first
+    let id = create_stream(&ctx, "To Delete", None, "@tester", "main").unwrap();
+
+    // Delete it
+    delete_stream(&ctx, &id, "@tester", "main").unwrap();
+
+    let event_files = ctx.get_event_files().unwrap();
+    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let lines: Vec<&str> = content.lines().collect();
+    assert_eq!(lines.len(), 2);
+
+    let delete_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    assert_eq!(delete_event["op"], "delete_stream");
+    assert_eq!(delete_event["id"], id);
 }

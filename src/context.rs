@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use crate::event::Event;
+use crate::migration;
 
 pub struct SpoolContext {
     pub root: PathBuf,
@@ -26,7 +27,10 @@ impl SpoolContext {
         loop {
             let spool_dir = current.join(".spool");
             if spool_dir.is_dir() {
-                return Ok(Self::new(spool_dir));
+                let ctx = Self::new(spool_dir);
+                // Check and run any needed migrations
+                migration::check_and_migrate(&ctx)?;
+                return Ok(ctx);
             }
             if !current.pop() {
                 return Err(anyhow!(
@@ -116,10 +120,16 @@ pub fn init() -> Result<()> {
 "#;
     fs::write(spool_dir.join(".gitignore"), gitignore)?;
 
+    // Write initial version file
+    let version = migration::VersionInfo::default();
+    let version_json = serde_json::to_string_pretty(&version)?;
+    fs::write(spool_dir.join("version.json"), version_json)?;
+
     println!("Created .spool/");
     println!("  .spool/events/     - Daily event logs");
     println!("  .spool/archive/    - Monthly rollups");
     println!("  .spool/.gitignore  - Ignores derived files");
+    println!("  .spool/version.json - Format version tracking");
 
     Ok(())
 }

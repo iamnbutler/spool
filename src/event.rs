@@ -15,6 +15,7 @@ pub struct Event {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Operation {
+    // Task operations
     Create,
     Update,
     Assign,
@@ -25,6 +26,10 @@ pub enum Operation {
     Reopen,
     Archive,
     SetStream,
+    // Stream operations
+    CreateStream,
+    UpdateStream,
+    DeleteStream,
 }
 
 impl std::fmt::Display for Operation {
@@ -40,6 +45,9 @@ impl std::fmt::Display for Operation {
             Operation::Reopen => write!(f, "reopen"),
             Operation::Archive => write!(f, "archive"),
             Operation::SetStream => write!(f, "set_stream"),
+            Operation::CreateStream => write!(f, "create_stream"),
+            Operation::UpdateStream => write!(f, "update_stream"),
+            Operation::DeleteStream => write!(f, "delete_stream"),
         }
     }
 }

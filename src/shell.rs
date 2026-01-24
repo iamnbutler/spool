@@ -10,7 +10,10 @@ use rustyline::validate::Validator;
 use rustyline::{Config, Editor, Helper};
 use std::borrow::Cow;
 
-use crate::cli::{complete_task, list_tasks, reopen_task, show_task, update_task, OutputFormat};
+use crate::cli::{
+    add_stream, complete_task, delete_stream, list_streams, list_tasks, reopen_task, show_stream,
+    show_task, update_stream_cmd, update_task, OutputFormat,
+};
 
 /// Parsed arguments for the add command
 struct AddArgs {
@@ -29,36 +32,34 @@ struct ListArgs {
     tag: Option<String>,
     priority: Option<String>,
     stream: Option<String>,
+    no_stream: bool,
     format: OutputFormat,
 }
 use crate::context::SpoolContext;
 use crate::state::load_or_materialize_state;
-use crate::writer::{
-    create_task, get_current_branch, get_current_user, set_stream, CreateTaskParams,
-};
+use crate::writer::{create_task, get_current_branch, get_current_user, CreateTaskParams};
 
 const COMMANDS: &[&str] = &[
-    "add", "list", "show", "update", "stream", "complete", "reopen", "help", "quit", "exit",
+    "add", "list", "show", "update", "complete", "reopen", "stream", "help", "quit", "exit",
 ];
+
+const STREAM_SUBCOMMANDS: &[&str] = &["add", "list", "show", "update", "delete"];
 
 const HELP_TEXT: &str = r#"
 spool shell - Interactive mode
 
-Commands:
-  add <title> [-d <description>] [-p <priority>] [-a <assignee>] [-t <tag>...] [--stream <name>]
+Task Commands:
+  add <title> [-d <description>] [-p <priority>] [-a <assignee>] [-t <tag>...] [--stream <id>]
       Create a new task
 
-  list [--status <open|complete|all>] [--assignee <name>] [--tag <tag>] [--priority <p>] [--stream <name>]
+  list [--status <open|complete|all>] [--assignee <name>] [--tag <tag>] [--priority <p>] [--stream <id>] [--no-stream]
       List tasks with optional filters
 
   show <task-id> [--events]
       Show details of a specific task
 
-  update <task-id> [-t <title>] [-d <description>] [-p <priority>] [--stream <name>]
+  update <task-id> [-t <title>] [-d <description>] [-p <priority>] [--stream <id>]
       Update a task's fields
-
-  stream <task-id> [<name>]
-      Move task to a stream (omit name to remove from stream)
 
   complete <task-id> [-r <resolution>]
       Mark a task as complete (resolution: done, wontfix, duplicate, obsolete)
@@ -66,13 +67,30 @@ Commands:
   reopen <task-id>
       Reopen a completed task
 
+Stream Commands:
+  stream add <name> [-d <description>]
+      Create a new stream (workstream/project)
+
+  stream list [-f <format>]
+      List all streams with task counts
+
+  stream show <stream-id> | --name <name>
+      Show stream details and its tasks
+
+  stream update <stream-id> [-n <name>] [-d <description>]
+      Update stream metadata
+
+  stream delete <stream-id>
+      Delete a stream (must have no tasks)
+
+Other:
   help
       Show this help message
 
   quit, exit
       Exit the shell
 
-Tab completion is available for commands and task IDs.
+Tab completion is available for commands, task IDs, and stream IDs.
 Use Up/Down arrows to navigate command history.
 "#;
 
@@ -88,6 +106,12 @@ impl SpoolCompleter {
     fn get_task_ids(&self) -> Vec<String> {
         load_or_materialize_state(&self.ctx)
             .map(|state| state.tasks.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    fn get_stream_ids(&self) -> Vec<String> {
+        load_or_materialize_state(&self.ctx)
+            .map(|state| state.streams.keys().cloned().collect())
             .unwrap_or_default()
     }
 }
@@ -149,6 +173,60 @@ impl Completer for SpoolCompleter {
                 line_to_cursor.rfind(' ').map(|i| i + 1).unwrap_or(0)
             };
             return Ok((start, candidates));
+        }
+
+        // Complete stream subcommands
+        if cmd == Some("stream") && words.len() <= 2 {
+            let prefix = if line_to_cursor.ends_with(' ') {
+                ""
+            } else {
+                words.get(1).copied().unwrap_or("")
+            };
+
+            let candidates: Vec<Pair> = STREAM_SUBCOMMANDS
+                .iter()
+                .filter(|s| s.starts_with(prefix))
+                .map(|s| Pair {
+                    display: s.to_string(),
+                    replacement: s.to_string(),
+                })
+                .collect();
+
+            let start = if line_to_cursor.ends_with(' ') {
+                pos
+            } else {
+                line_to_cursor.rfind(' ').map(|i| i + 1).unwrap_or(0)
+            };
+            return Ok((start, candidates));
+        }
+
+        // Complete stream IDs for stream show/update/delete
+        if cmd == Some("stream") && words.len() >= 2 && words.len() <= 3 {
+            let subcmd = words.get(1).copied();
+            if subcmd == Some("show") || subcmd == Some("update") || subcmd == Some("delete") {
+                let prefix = if line_to_cursor.ends_with(' ') {
+                    ""
+                } else {
+                    words.get(2).copied().unwrap_or("")
+                };
+
+                let stream_ids = self.get_stream_ids();
+                let candidates: Vec<Pair> = stream_ids
+                    .iter()
+                    .filter(|id| id.starts_with(prefix))
+                    .map(|id| Pair {
+                        display: id.clone(),
+                        replacement: id.clone(),
+                    })
+                    .collect();
+
+                let start = if line_to_cursor.ends_with(' ') {
+                    pos
+                } else {
+                    line_to_cursor.rfind(' ').map(|i| i + 1).unwrap_or(0)
+                };
+                return Ok((start, candidates));
+            }
         }
 
         // Complete flags for list command
@@ -340,6 +418,7 @@ fn parse_list_args(args: &[&str]) -> ListArgs {
     let mut tag = None;
     let mut priority = None;
     let mut stream = None;
+    let mut no_stream = false;
     let mut format = OutputFormat::Table;
 
     let mut i = 0;
@@ -375,6 +454,9 @@ fn parse_list_args(args: &[&str]) -> ListArgs {
                     stream = Some(args[i].to_string());
                 }
             }
+            "--no-stream" => {
+                no_stream = true;
+            }
             "-f" | "--format" => {
                 i += 1;
                 if i < args.len() {
@@ -392,6 +474,7 @@ fn parse_list_args(args: &[&str]) -> ListArgs {
         tag,
         priority,
         stream,
+        no_stream,
         format,
     }
 }
@@ -471,6 +554,90 @@ fn parse_update_args(args: &[&str]) -> UpdateArgs {
     }
 }
 
+struct StreamAddArgs {
+    name: String,
+    description: Option<String>,
+}
+
+fn parse_stream_add_args(args: &[&str]) -> Result<StreamAddArgs> {
+    if args.is_empty() {
+        return Err(anyhow!("Usage: stream add <name> [-d description]"));
+    }
+
+    let mut name_parts = Vec::new();
+    let mut description = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i] {
+            "-d" | "--description" => {
+                i += 1;
+                if i < args.len() {
+                    description = Some(args[i].to_string());
+                }
+            }
+            _ => {
+                if !args[i].starts_with('-') {
+                    name_parts.push(args[i]);
+                }
+            }
+        }
+        i += 1;
+    }
+
+    if name_parts.is_empty() {
+        return Err(anyhow!("Stream name is required"));
+    }
+
+    Ok(StreamAddArgs {
+        name: name_parts.join(" "),
+        description,
+    })
+}
+
+struct StreamUpdateArgs {
+    name: Option<String>,
+    description: Option<String>,
+}
+
+fn parse_stream_update_args(args: &[&str]) -> StreamUpdateArgs {
+    let mut name = None;
+    let mut description = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i] {
+            "-n" | "--name" => {
+                i += 1;
+                if i < args.len() {
+                    name = Some(args[i].to_string());
+                }
+            }
+            "-d" | "--description" => {
+                i += 1;
+                if i < args.len() {
+                    description = Some(args[i].to_string());
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    StreamUpdateArgs { name, description }
+}
+
+fn parse_format_arg(args: &[&str]) -> OutputFormat {
+    let mut i = 0;
+    while i < args.len() {
+        if (args[i] == "-f" || args[i] == "--format") && i + 1 < args.len() {
+            return OutputFormat::from_str(args[i + 1]);
+        }
+        i += 1;
+    }
+    OutputFormat::Table
+}
+
 fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
     let parts = shell_split(line);
     if parts.is_empty() {
@@ -517,6 +684,7 @@ fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
                 list_args.tag.as_deref(),
                 list_args.priority.as_deref(),
                 list_args.stream.as_deref(),
+                list_args.no_stream,
                 list_args.format,
             )?;
         }
@@ -543,19 +711,66 @@ fn execute_command(ctx: &SpoolContext, line: &str) -> Result<bool> {
         }
         "stream" => {
             if args.is_empty() {
-                return Err(anyhow!("Usage: stream <task-id> [<stream-name>]"));
+                return Err(anyhow!(
+                    "Usage: stream <add|list|show|update|delete> [args...]"
+                ));
             }
-            let id = args[0];
-            let stream_name = args.get(1).copied();
+            let subcmd = args[0];
+            let subargs = &args[1..];
 
-            let user = get_current_user()?;
-            let branch = get_current_branch()?;
-
-            set_stream(ctx, id, stream_name, &user, &branch)?;
-
-            match stream_name {
-                Some(s) => println!("Moved task {} to stream '{}'", id, s),
-                None => println!("Removed task {} from stream", id),
+            match subcmd {
+                "add" => {
+                    let stream_args = parse_stream_add_args(subargs)?;
+                    add_stream(ctx, &stream_args.name, stream_args.description.as_deref())?;
+                }
+                "list" => {
+                    let format = parse_format_arg(subargs);
+                    list_streams(ctx, format)?;
+                }
+                "show" => {
+                    if subargs.is_empty() {
+                        return Err(anyhow!(
+                            "Usage: stream show <stream-id> or stream show --name <name>"
+                        ));
+                    }
+                    // Check for --name flag
+                    let (id, name) = if subargs[0] == "-n" || subargs[0] == "--name" {
+                        if subargs.len() < 2 {
+                            return Err(anyhow!("Usage: stream show --name <name>"));
+                        }
+                        (None, Some(subargs[1]))
+                    } else {
+                        (Some(subargs[0]), None)
+                    };
+                    show_stream(ctx, id, name)?;
+                }
+                "update" => {
+                    if subargs.is_empty() {
+                        return Err(anyhow!(
+                            "Usage: stream update <stream-id> [-n name] [-d description]"
+                        ));
+                    }
+                    let id = subargs[0];
+                    let update_args = parse_stream_update_args(&subargs[1..]);
+                    update_stream_cmd(
+                        ctx,
+                        id,
+                        update_args.name.as_deref(),
+                        update_args.description.as_deref(),
+                    )?;
+                }
+                "delete" => {
+                    if subargs.is_empty() {
+                        return Err(anyhow!("Usage: stream delete <stream-id>"));
+                    }
+                    delete_stream(ctx, subargs[0])?;
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "Unknown stream subcommand: {}. Use 'stream add|list|show|update|delete'.",
+                        subcmd
+                    ));
+                }
             }
         }
         "complete" | "done" | "close" => {
@@ -608,7 +823,7 @@ pub fn run_shell(ctx: SpoolContext) -> Result<()> {
 
     let _ = rl.load_history(&history_path);
 
-    println!("spool shell v0.3.1");
+    println!("spool shell v0.4.0");
     println!("Type 'help' for available commands, 'quit' to exit.\n");
 
     loop {
