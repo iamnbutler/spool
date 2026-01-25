@@ -476,6 +476,8 @@ fn draw_history_list(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(list, chunks[1]);
 }
 
+// Lines are built conditionally based on event type (task vs stream) and optional fields,
+// so initializing with vec![] and pushing is clearer than a complex vec![...] literal.
 #[allow(clippy::vec_init_then_push)]
 fn draw_history_detail(f: &mut Frame, area: Rect, app: &App) {
     let content = if let Some(event) = app.selected_history_event() {
