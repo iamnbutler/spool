@@ -11,7 +11,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use app::App;
+use app::{App, InputMode};
 
 fn main() -> Result<()> {
     // Setup terminal
@@ -43,35 +43,59 @@ fn main() -> Result<()> {
 
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
-        terminal.draw(|f| ui::draw(f, &app))?;
+        terminal.draw(|f| ui::draw(f, &mut app))?;
 
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
-                if app.search_mode {
-                    match key.code {
+                // Clear message on any keypress
+                app.clear_message();
+
+                match app.input_mode {
+                    InputMode::NewTask => match key.code {
+                        KeyCode::Esc => app.cancel_input(),
+                        KeyCode::Enter => app.submit_new_task(),
+                        KeyCode::Backspace => app.input_backspace(),
+                        KeyCode::Char(c) => app.input_char(c),
+                        _ => {}
+                    },
+                    InputMode::Normal if app.search_mode => match key.code {
                         KeyCode::Esc => app.toggle_search(),
                         KeyCode::Enter => app.toggle_search(),
                         KeyCode::Backspace => app.search_backspace(),
                         KeyCode::Char(c) => app.search_input(c),
                         _ => {}
-                    }
-                } else {
-                    match key.code {
+                    },
+                    InputMode::Normal => match key.code {
                         KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Char('j') | KeyCode::Down => app.next_task(),
-                        KeyCode::Char('k') | KeyCode::Up => app.previous_task(),
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            if app.focus == app::Focus::Detail {
+                                app.scroll_detail_down();
+                            } else {
+                                app.next_task();
+                            }
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            if app.focus == app::Focus::Detail {
+                                app.scroll_detail_up();
+                            } else {
+                                app.previous_task();
+                            }
+                        }
                         KeyCode::Char('g') => app.first_task(),
                         KeyCode::Char('G') => app.last_task(),
                         KeyCode::Tab => app.toggle_focus(),
                         KeyCode::Enter => app.toggle_detail(),
-                        KeyCode::Char('e') => app.toggle_events(),
-                        KeyCode::Char('f') => app.cycle_status_filter(),
+                        KeyCode::Char('v') => app.cycle_status_filter(),
                         KeyCode::Char('s') => app.cycle_sort(),
                         KeyCode::Char('S') => app.cycle_stream_filter(),
                         KeyCode::Char('/') => app.toggle_search(),
                         KeyCode::Esc => app.clear_search(),
+                        // Task editing
+                        KeyCode::Char('c') => app.complete_selected_task(),
+                        KeyCode::Char('r') => app.reopen_selected_task(),
+                        KeyCode::Char('n') => app.start_new_task(),
                         _ => {}
-                    }
+                    },
                 }
             }
         }

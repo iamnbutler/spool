@@ -6,21 +6,41 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, Focus};
+use crate::app::{App, Focus, InputMode};
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
+    // Determine if we need a message/input bar
+    let has_message = app.message.is_some();
+    let in_input_mode = app.input_mode == InputMode::NewTask;
+    let show_bar = has_message || in_input_mode;
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // Header
-            Constraint::Min(0),    // Main content
-            Constraint::Length(1), // Footer
-        ])
+        .constraints(if show_bar {
+            vec![
+                Constraint::Length(1), // Header
+                Constraint::Min(0),    // Main content
+                Constraint::Length(1), // Message/Input bar
+                Constraint::Length(1), // Footer
+            ]
+        } else {
+            vec![
+                Constraint::Length(1), // Header
+                Constraint::Min(0),    // Main content
+                Constraint::Length(1), // Footer
+            ]
+        })
         .split(f.area());
 
     draw_header(f, chunks[0], app);
     draw_main(f, chunks[1], app);
-    draw_footer(f, chunks[2], app);
+
+    if show_bar {
+        draw_input_bar(f, chunks[2], app);
+        draw_footer(f, chunks[3], app);
+    } else {
+        draw_footer(f, chunks[2], app);
+    }
 }
 
 fn draw_header(f: &mut Frame, area: Rect, app: &App) {
@@ -52,7 +72,7 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(header, area);
 }
 
-fn draw_main(f: &mut Frame, area: Rect, app: &App) {
+fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
     if app.show_detail {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -66,7 +86,7 @@ fn draw_main(f: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
+fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
     let items: Vec<ListItem> = app
         .tasks
         .iter()
@@ -132,7 +152,7 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(list, area);
 }
 
-fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
+fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
     let border_style = if app.focus == Focus::Detail {
         Style::default().fg(Color::Cyan)
     } else {
@@ -224,7 +244,7 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
         }
 
         // Event history
-        if app.show_events && !app.task_events.is_empty() {
+        if !app.task_events.is_empty() {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![Span::styled(
                 "Event History:",
@@ -262,11 +282,11 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
         vec![Line::from("No task selected")]
     };
 
-    let title = if app.show_events {
-        " Detail + Events "
-    } else {
-        " Detail (e: events) "
-    };
+    let title = " Detail ";
+
+    // Update scroll bounds (area height minus borders)
+    let content_height = content.len() as u16;
+    let visible_height = area.height.saturating_sub(2);
 
     let detail = Paragraph::new(content)
         .block(
@@ -275,16 +295,43 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
                 .border_style(border_style)
                 .title(title),
         )
-        .wrap(Wrap { trim: false });
+        .wrap(Wrap { trim: false })
+        .scroll((app.detail_scroll, 0));
 
     f.render_widget(detail, area);
+
+    // Set after content is consumed
+    app.detail_content_height = content_height;
+    app.detail_visible_height = visible_height;
+}
+
+fn draw_input_bar(f: &mut Frame, area: Rect, app: &App) {
+    let content = if app.input_mode == InputMode::NewTask {
+        Line::from(vec![
+            Span::styled(" New task: ", Style::default().fg(Color::Cyan)),
+            Span::raw(&app.input_buffer),
+            Span::styled("▌", Style::default().fg(Color::Cyan)),
+        ])
+    } else if let Some(msg) = &app.message {
+        Line::from(vec![Span::styled(
+            format!(" {}", msg),
+            Style::default().fg(Color::Yellow),
+        )])
+    } else {
+        Line::from("")
+    };
+
+    let bar = Paragraph::new(content);
+    f.render_widget(bar, area);
 }
 
 fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
-    let help = if app.search_mode {
-        " Type to search, Enter/Esc to close "
-    } else {
-        " q:quit  j/k:nav  Enter:detail  e:events  f:filter  s:sort  S:stream  /:search "
+    let help = match app.input_mode {
+        InputMode::NewTask => " Enter:create  Esc:cancel ",
+        InputMode::Normal if app.search_mode => " Type to search, Enter/Esc to close ",
+        InputMode::Normal => {
+            " q:quit  j/k:nav  c:complete  r:reopen  n:new  v:view  s:sort  /:search "
+        }
     };
     let footer = Paragraph::new(help).style(Style::default().fg(Color::DarkGray));
     f.render_widget(footer, area);

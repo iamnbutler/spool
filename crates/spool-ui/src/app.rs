@@ -2,6 +2,7 @@ use anyhow::Result;
 use spool::context::SpoolContext;
 use spool::event::Event;
 use spool::state::{load_or_materialize_state, Stream, Task, TaskStatus};
+use spool::writer::{self, CreateTaskParams};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
@@ -59,7 +60,20 @@ impl SortBy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputMode {
+    Normal,
+    NewTask,
+}
+
 pub struct App {
+    // Input state
+    pub input_mode: InputMode,
+    pub input_buffer: String,
+    pub message: Option<String>,
+    pub detail_scroll: u16,
+    pub detail_content_height: u16, // set by UI during render
+    pub detail_visible_height: u16, // set by UI during render
     pub tasks: Vec<Task>,
     pub streams: std::collections::HashMap<String, Stream>,
     pub stream_ids: Vec<String>, // sorted list of stream IDs for cycling
@@ -67,7 +81,6 @@ pub struct App {
     pub selected: usize,
     pub focus: Focus,
     pub show_detail: bool,
-    pub show_events: bool,
     pub status_filter: StatusFilter,
     pub sort_by: SortBy,
     pub search_query: String,
@@ -102,6 +115,12 @@ impl App {
         });
 
         Ok(Self {
+            input_mode: InputMode::Normal,
+            input_buffer: String::new(),
+            message: None,
+            detail_scroll: 0,
+            detail_content_height: 0,
+            detail_visible_height: 0,
             tasks,
             streams,
             stream_ids,
@@ -109,7 +128,6 @@ impl App {
             selected: 0,
             focus: Focus::TaskList,
             show_detail: false,
-            show_events: false,
             status_filter: StatusFilter::Open,
             sort_by: SortBy::Priority,
             search_query: String::new(),
@@ -221,11 +239,32 @@ impl App {
     pub fn next_task(&mut self) {
         if !self.tasks.is_empty() {
             self.selected = (self.selected + 1).min(self.tasks.len() - 1);
+            self.detail_scroll = 0;
+            if self.show_detail {
+                let _ = self.load_task_events();
+            }
         }
     }
 
     pub fn previous_task(&mut self) {
         self.selected = self.selected.saturating_sub(1);
+        self.detail_scroll = 0;
+        if self.show_detail {
+            let _ = self.load_task_events();
+        }
+    }
+
+    pub fn scroll_detail_down(&mut self) {
+        let max_scroll = self
+            .detail_content_height
+            .saturating_sub(self.detail_visible_height);
+        if self.detail_scroll < max_scroll {
+            self.detail_scroll = self.detail_scroll.saturating_add(1);
+        }
+    }
+
+    pub fn scroll_detail_up(&mut self) {
+        self.detail_scroll = self.detail_scroll.saturating_sub(1);
     }
 
     pub fn first_task(&mut self) {
@@ -247,11 +286,7 @@ impl App {
 
     pub fn toggle_detail(&mut self) {
         self.show_detail = !self.show_detail;
-    }
-
-    pub fn toggle_events(&mut self) {
-        self.show_events = !self.show_events;
-        if self.show_events {
+        if self.show_detail {
             let _ = self.load_task_events();
         }
     }
@@ -317,5 +352,104 @@ impl App {
                 .map(|s| s.name.clone())
                 .unwrap_or_else(|| id.clone()),
         }
+    }
+
+    // Task editing methods
+
+    pub fn complete_selected_task(&mut self) {
+        if let Some(task) = self.selected_task() {
+            if task.status == TaskStatus::Complete {
+                self.message = Some("Task already complete".to_string());
+                return;
+            }
+            let id = task.id.clone();
+            let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+            let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+            match writer::complete_task(&self.ctx, &id, None, &by, &branch) {
+                Ok(()) => {
+                    self.message = Some(format!("Completed: {}", id));
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    pub fn reopen_selected_task(&mut self) {
+        if let Some(task) = self.selected_task() {
+            if task.status == TaskStatus::Open {
+                self.message = Some("Task already open".to_string());
+                return;
+            }
+            let id = task.id.clone();
+            let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+            let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+            match writer::reopen_task(&self.ctx, &id, &by, &branch) {
+                Ok(()) => {
+                    self.message = Some(format!("Reopened: {}", id));
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    pub fn start_new_task(&mut self) {
+        self.input_mode = InputMode::NewTask;
+        self.input_buffer.clear();
+        self.message = None;
+    }
+
+    pub fn cancel_input(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
+    pub fn submit_new_task(&mut self) {
+        if self.input_buffer.trim().is_empty() {
+            self.message = Some("Title cannot be empty".to_string());
+            self.input_mode = InputMode::Normal;
+            return;
+        }
+
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        let params = CreateTaskParams {
+            title: self.input_buffer.trim(),
+            stream: self.stream_filter.as_deref(),
+            ..Default::default()
+        };
+
+        match writer::create_task(&self.ctx, params, &by, &branch) {
+            Ok(id) => {
+                self.message = Some(format!("Created: {}", id));
+                let _ = self.reload_tasks();
+            }
+            Err(e) => {
+                self.message = Some(format!("Error: {}", e));
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
+    pub fn input_char(&mut self, c: char) {
+        self.input_buffer.push(c);
+    }
+
+    pub fn input_backspace(&mut self) {
+        self.input_buffer.pop();
+    }
+
+    pub fn clear_message(&mut self) {
+        self.message = None;
     }
 }

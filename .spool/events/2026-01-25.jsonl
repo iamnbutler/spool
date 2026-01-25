@@ -14,3 +14,4 @@
 {"v":1,"op":"complete","id":"mkt1fg56-slln","ts":"2026-01-25T01:21:47.590685Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
 {"v":1,"op":"assign","id":"mkt1fgfp-tbob","ts":"2026-01-25T01:21:59.408460Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"to":"@iamnbutler"}}
 {"v":1,"op":"complete","id":"mkt1fgfp-tbob","ts":"2026-01-25T01:23:44.906781Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mkt1fgsb-dj1f","ts":"2026-01-25T01:39:42.430656Z","by":"@iamnbutler","branch":"feature/tui-editing","d":{"resolution":"done"}}
