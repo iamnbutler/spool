@@ -72,6 +72,8 @@ pub struct App {
     pub input_buffer: String,
     pub message: Option<String>,
     pub detail_scroll: u16,
+    pub detail_content_height: u16, // set by UI during render
+    pub detail_visible_height: u16, // set by UI during render
     pub tasks: Vec<Task>,
     pub streams: std::collections::HashMap<String, Stream>,
     pub stream_ids: Vec<String>, // sorted list of stream IDs for cycling
@@ -118,6 +120,8 @@ impl App {
             input_buffer: String::new(),
             message: None,
             detail_scroll: 0,
+            detail_content_height: 0,
+            detail_visible_height: 0,
             tasks,
             streams,
             stream_ids,
@@ -247,7 +251,12 @@ impl App {
     }
 
     pub fn scroll_detail_down(&mut self) {
-        self.detail_scroll = self.detail_scroll.saturating_add(1);
+        let max_scroll = self
+            .detail_content_height
+            .saturating_sub(self.detail_visible_height);
+        if self.detail_scroll < max_scroll {
+            self.detail_scroll = self.detail_scroll.saturating_add(1);
+        }
     }
 
     pub fn scroll_detail_up(&mut self) {

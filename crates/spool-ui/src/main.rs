@@ -43,7 +43,7 @@ fn main() -> Result<()> {
 
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
-        terminal.draw(|f| ui::draw(f, &app))?;
+        terminal.draw(|f| ui::draw(f, &mut app))?;
 
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {

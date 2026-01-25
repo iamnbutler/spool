@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::app::{App, Focus, InputMode};
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     // Determine if we need a message/input bar
     let has_message = app.message.is_some();
     let in_input_mode = app.input_mode == InputMode::NewTask;
@@ -72,7 +72,7 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(header, area);
 }
 
-fn draw_main(f: &mut Frame, area: Rect, app: &App) {
+fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
     if app.show_detail {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
@@ -86,7 +86,7 @@ fn draw_main(f: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
+fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
     let items: Vec<ListItem> = app
         .tasks
         .iter()
@@ -152,7 +152,7 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(list, area);
 }
 
-fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
+fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
     let border_style = if app.focus == Focus::Detail {
         Style::default().fg(Color::Cyan)
     } else {
@@ -288,6 +288,10 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
         " Detail (e: events) "
     };
 
+    // Update scroll bounds (area height minus borders)
+    let content_height = content.len() as u16;
+    let visible_height = area.height.saturating_sub(2);
+
     let detail = Paragraph::new(content)
         .block(
             Block::default()
@@ -299,6 +303,10 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
         .scroll((app.detail_scroll, 0));
 
     f.render_widget(detail, area);
+
+    // Set after content is consumed
+    app.detail_content_height = content_height;
+    app.detail_visible_height = visible_height;
 }
 
 fn draw_input_bar(f: &mut Frame, area: Rect, app: &App) {
