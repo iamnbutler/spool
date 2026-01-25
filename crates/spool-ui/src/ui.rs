@@ -20,22 +20,33 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     draw_header(f, chunks[0], app);
     draw_main(f, chunks[1], app);
-    draw_footer(f, chunks[2]);
+    draw_footer(f, chunks[2], app);
 }
 
 fn draw_header(f: &mut Frame, area: Rect, app: &App) {
+    let search_indicator = if !app.search_query.is_empty() {
+        format!("  filter: \"{}\"", app.search_query)
+    } else {
+        String::new()
+    };
+
     let title = format!(
-        " spool  {} tasks ({})",
+        " spool  {} tasks  [{}]  sort: {}{}",
         app.tasks.len(),
-        app.status_filter.label()
+        app.status_filter.label(),
+        app.sort_by.label(),
+        search_indicator,
     );
-    let header = Paragraph::new(title).style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    let header = Paragraph::new(title).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
     f.render_widget(header, area);
 }
 
 fn draw_main(f: &mut Frame, area: Rect, app: &App) {
     if app.show_detail {
-        // Split into list and detail
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
@@ -62,6 +73,11 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
                 _ => Style::default().fg(Color::DarkGray),
             };
 
+            let status_marker = match task.status {
+                spool::state::TaskStatus::Open => " ",
+                spool::state::TaskStatus::Complete => "✓",
+            };
+
             let assignee = task
                 .assignee
                 .as_deref()
@@ -69,6 +85,7 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
                 .unwrap_or_default();
 
             let line = Line::from(vec![
+                Span::styled(status_marker, Style::default().fg(Color::Green)),
                 Span::styled(format!("{:4} ", priority), priority_style),
                 Span::raw(&task.title),
                 Span::styled(assignee, Style::default().fg(Color::DarkGray)),
@@ -92,11 +109,17 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &App) {
         Style::default().fg(Color::DarkGray)
     };
 
+    let title = if app.search_mode {
+        format!(" Tasks  /{}▌", app.search_query)
+    } else {
+        " Tasks ".to_string()
+    };
+
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
             .border_style(border_style)
-            .title(" Tasks "),
+            .title(title),
     );
 
     f.render_widget(list, area);
@@ -121,38 +144,110 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
             ]),
             Line::from(vec![
                 Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
-                Span::raw(format!("{:?}", task.status)),
+                Span::styled(
+                    format!("{:?}", task.status),
+                    match task.status {
+                        spool::state::TaskStatus::Open => Style::default().fg(Color::Yellow),
+                        spool::state::TaskStatus::Complete => Style::default().fg(Color::Green),
+                    },
+                ),
             ]),
         ];
 
         if let Some(priority) = &task.priority {
+            let priority_style = match priority.as_str() {
+                "p0" => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                "p1" => Style::default().fg(Color::Yellow),
+                "p2" => Style::default().fg(Color::Blue),
+                _ => Style::default().fg(Color::DarkGray),
+            };
             lines.push(Line::from(vec![
                 Span::styled("Priority: ", Style::default().fg(Color::DarkGray)),
-                Span::raw(priority),
+                Span::styled(priority, priority_style),
             ]));
         }
 
         if let Some(assignee) = &task.assignee {
             lines.push(Line::from(vec![
                 Span::styled("Assignee: ", Style::default().fg(Color::DarkGray)),
-                Span::raw(assignee),
+                Span::styled(assignee, Style::default().fg(Color::Cyan)),
             ]));
         }
 
         if !task.tags.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("Tags: ", Style::default().fg(Color::DarkGray)),
-                Span::raw(task.tags.join(", ")),
+                Span::styled(task.tags.join(", "), Style::default().fg(Color::Magenta)),
             ]));
         }
+
+        if let Some(stream_id) = &task.stream {
+            let stream_name = app
+                .get_stream(stream_id)
+                .map(|s| s.name.as_str())
+                .unwrap_or(stream_id);
+            lines.push(Line::from(vec![
+                Span::styled("Stream: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(stream_name, Style::default().fg(Color::Blue)),
+            ]));
+        }
+
+        // Created timestamp
+        lines.push(Line::from(vec![
+            Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
+            Span::raw(task.created.format("%Y-%m-%d %H:%M").to_string()),
+        ]));
+
+        lines.push(Line::from(vec![
+            Span::styled("Updated: ", Style::default().fg(Color::DarkGray)),
+            Span::raw(task.updated.format("%Y-%m-%d %H:%M").to_string()),
+        ]));
 
         if let Some(desc) = &task.description {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![Span::styled(
                 "Description:",
-                Style::default().fg(Color::DarkGray),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::UNDERLINED),
             )]));
-            lines.push(Line::from(desc.as_str()));
+            for line in desc.lines() {
+                lines.push(Line::from(line));
+            }
+        }
+
+        // Event history
+        if app.show_events && !app.task_events.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![Span::styled(
+                "Event History:",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::UNDERLINED),
+            )]));
+
+            for event in &app.task_events {
+                let op_style = match event.op.to_string().as_str() {
+                    "create" => Style::default().fg(Color::Green),
+                    "complete" => Style::default().fg(Color::Blue),
+                    "update" => Style::default().fg(Color::Yellow),
+                    "assign" => Style::default().fg(Color::Cyan),
+                    _ => Style::default().fg(Color::DarkGray),
+                };
+
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        event.ts.format("%m-%d %H:%M").to_string(),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(format!("{:12}", event.op), op_style),
+                    Span::styled(
+                        format!(" by {}", event.by),
+                        Style::default().fg(Color::DarkGray),
+                    ),
+                ]));
+            }
         }
 
         lines
@@ -160,20 +255,30 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &App) {
         vec![Line::from("No task selected")]
     };
 
+    let title = if app.show_events {
+        " Detail + Events "
+    } else {
+        " Detail (e: events) "
+    };
+
     let detail = Paragraph::new(content)
         .block(
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(" Detail "),
+                .title(title),
         )
         .wrap(Wrap { trim: false });
 
     f.render_widget(detail, area);
 }
 
-fn draw_footer(f: &mut Frame, area: Rect) {
-    let help = " q: quit  j/k: navigate  Enter: toggle detail  Tab: switch focus ";
+fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
+    let help = if app.search_mode {
+        " Type to search, Enter/Esc to close "
+    } else {
+        " q:quit  j/k:nav  Enter:detail  e:events  f:filter  s:sort  /:search "
+    };
     let footer = Paragraph::new(help).style(Style::default().fg(Color::DarkGray));
     f.render_widget(footer, area);
 }

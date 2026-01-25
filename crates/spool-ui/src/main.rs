@@ -47,15 +47,30 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
 
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Char('j') | KeyCode::Down => app.next_task(),
-                    KeyCode::Char('k') | KeyCode::Up => app.previous_task(),
-                    KeyCode::Char('g') => app.first_task(),
-                    KeyCode::Char('G') => app.last_task(),
-                    KeyCode::Tab => app.toggle_focus(),
-                    KeyCode::Enter => app.toggle_detail(),
-                    _ => {}
+                if app.search_mode {
+                    match key.code {
+                        KeyCode::Esc => app.toggle_search(),
+                        KeyCode::Enter => app.toggle_search(),
+                        KeyCode::Backspace => app.search_backspace(),
+                        KeyCode::Char(c) => app.search_input(c),
+                        _ => {}
+                    }
+                } else {
+                    match key.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('j') | KeyCode::Down => app.next_task(),
+                        KeyCode::Char('k') | KeyCode::Up => app.previous_task(),
+                        KeyCode::Char('g') => app.first_task(),
+                        KeyCode::Char('G') => app.last_task(),
+                        KeyCode::Tab => app.toggle_focus(),
+                        KeyCode::Enter => app.toggle_detail(),
+                        KeyCode::Char('e') => app.toggle_events(),
+                        KeyCode::Char('f') => app.cycle_status_filter(),
+                        KeyCode::Char('s') => app.cycle_sort(),
+                        KeyCode::Char('/') => app.toggle_search(),
+                        KeyCode::Esc => app.clear_search(),
+                        _ => {}
+                    }
                 }
             }
         }
