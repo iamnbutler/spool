@@ -15,7 +15,7 @@ name = "spool"
 path = "src/main.rs"
 
 [dependencies]
-spool = { path = "../spool" }
+spool = { version = "1.0.0", path = "../spool" }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 
