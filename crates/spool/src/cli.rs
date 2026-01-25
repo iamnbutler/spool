@@ -58,11 +58,14 @@ pub enum Commands {
         /// Filter by priority
         #[arg(short, long)]
         priority: Option<String>,
-        /// Filter by stream
-        #[arg(long)]
+        /// Filter by stream ID
+        #[arg(long, conflicts_with = "stream_name")]
         stream: Option<String>,
+        /// Filter by stream name
+        #[arg(long, conflicts_with = "stream")]
+        stream_name: Option<String>,
         /// Show only tasks without a stream
-        #[arg(long)]
+        #[arg(long, conflicts_with_all = ["stream", "stream_name"])]
         no_stream: bool,
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table")]
@@ -216,10 +219,23 @@ pub fn list_tasks(
     tag: Option<&str>,
     priority: Option<&str>,
     stream: Option<&str>,
+    stream_name: Option<&str>,
     no_stream: bool,
     format: OutputFormat,
 ) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
+
+    // Resolve stream_name to stream ID if provided
+    let stream_id_from_name: Option<String> = stream_name.and_then(|name| {
+        state
+            .streams
+            .iter()
+            .find(|(_, s)| s.name.eq_ignore_ascii_case(name))
+            .map(|(id, _)| id.clone())
+    });
+
+    // Use stream ID directly, or resolved from name
+    let effective_stream = stream.map(String::from).or(stream_id_from_name);
 
     let mut tasks: Vec<&Task> = state
         .tasks
@@ -246,12 +262,13 @@ pub fn list_tasks(
                 .map(|p| t.priority.as_deref() == Some(p))
                 .unwrap_or(true);
 
-            // Stream filter (--stream and --no-stream are mutually exclusive)
+            // Stream filter (--stream, --stream-name, and --no-stream are mutually exclusive)
             let stream_match = if no_stream {
                 t.stream.is_none()
             } else {
-                stream
-                    .map(|s| t.stream.as_deref() == Some(s))
+                effective_stream
+                    .as_ref()
+                    .map(|s| t.stream.as_deref() == Some(s.as_str()))
                     .unwrap_or(true)
             };
 

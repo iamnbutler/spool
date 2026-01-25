@@ -41,6 +41,7 @@ fn main() -> Result<()> {
             tag,
             priority,
             stream,
+            stream_name,
             no_stream,
             format,
         } => {
@@ -53,6 +54,7 @@ fn main() -> Result<()> {
                 tag.as_deref(),
                 priority.as_deref(),
                 stream.as_deref(),
+                stream_name.as_deref(),
                 no_stream,
                 fmt,
             )
