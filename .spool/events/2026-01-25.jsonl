@@ -7,3 +7,10 @@
 {"v":1,"op":"create","id":"mkt1fgsb-dj1f","ts":"2026-01-25T01:06:17.147562Z","by":"@iamnbutler","branch":"main","d":{"description":"Inline editing of task fields, create new tasks","priority":"p2","stream":"mkt1em7k-tihv","title":"Task editing"}}
 {"v":1,"op":"complete","id":"mkt1f8lo-ecex","ts":"2026-01-25T01:09:44.088338Z","by":"@iamnbutler","branch":"workspace-migration","d":{"resolution":"done"}}
 {"v":1,"op":"assign","id":"mkt1ffek-rpqh","ts":"2026-01-25T01:14:30.170529Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"to":"@iamnbutler"}}
+{"v":1,"op":"complete","id":"mkt1ffek-rpqh","ts":"2026-01-25T01:16:47.918635Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
+{"v":1,"op":"assign","id":"mkt1ffrj-kwad","ts":"2026-01-25T01:17:11.355095Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"to":"@iamnbutler"}}
+{"v":1,"op":"assign","id":"mkt1fg56-slln","ts":"2026-01-25T01:17:11.790785Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"to":"@iamnbutler"}}
+{"v":1,"op":"complete","id":"mkt1ffrj-kwad","ts":"2026-01-25T01:21:47.550921Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
+{"v":1,"op":"complete","id":"mkt1fg56-slln","ts":"2026-01-25T01:21:47.590685Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
+{"v":1,"op":"assign","id":"mkt1fgfp-tbob","ts":"2026-01-25T01:21:59.408460Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"to":"@iamnbutler"}}
+{"v":1,"op":"complete","id":"mkt1fgfp-tbob","ts":"2026-01-25T01:23:44.906781Z","by":"@iamnbutler","branch":"tui-basic-frame","d":{"resolution":"done"}}
