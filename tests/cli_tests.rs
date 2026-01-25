@@ -224,12 +224,6 @@ fn test_output_format_clone() {
 }
 
 #[test]
-fn test_cli_parse_shell() {
-    let cli = Cli::parse_from(["spool", "shell"]);
-    assert!(matches!(cli.command, Commands::Shell));
-}
-
-#[test]
 fn test_cli_parse_complete_defaults() {
     let cli = Cli::parse_from(["spool", "complete", "task-123"]);
 

@@ -8,7 +8,6 @@ use spool::cli::{
     Cli, Commands, OutputFormat, StreamCommands,
 };
 use spool::context::{init, SpoolContext};
-use spool::shell::run_shell;
 use spool::state::rebuild;
 use spool::validation::validate;
 
@@ -75,10 +74,6 @@ fn main() -> Result<()> {
             let ctx = SpoolContext::discover()?;
             validate(&ctx, strict)?;
             Ok(())
-        }
-        Commands::Shell => {
-            let ctx = SpoolContext::discover()?;
-            run_shell(ctx)
         }
         Commands::Complete { id, resolution } => {
             let ctx = SpoolContext::discover()?;

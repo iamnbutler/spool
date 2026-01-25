@@ -93,8 +93,6 @@ pub enum Commands {
         #[arg(long)]
         strict: bool,
     },
-    /// Start interactive shell mode
-    Shell,
     /// Mark a task as complete
     Complete {
         /// Task ID to complete
