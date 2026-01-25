@@ -56,7 +56,8 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
 [[ "$LOCAL" != "$REMOTE" ]] && error "Local main is not up to date with origin. Run 'git pull' first."
 
-CURRENT_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+# Read version from workspace.package
+CURRENT_VERSION=$(grep -A5 '\[workspace.package\]' Cargo.toml | grep '^version = ' | sed 's/version = "\(.*\)"/\1/')
 [[ -z "$CURRENT_VERSION" ]] && error "Could not read version from Cargo.toml"
 
 log "Current version: $CURRENT_VERSION"
@@ -76,11 +77,11 @@ log "New version: $NEW_VERSION"
 
 if $DRY_RUN; then
     log "[dry-run] Would create branch: $RELEASE_BRANCH"
-    log "[dry-run] Would update Cargo.toml, src/shell.rs, Cargo.lock"
+    log "[dry-run] Would update Cargo.toml (workspace + crates)"
     log "[dry-run] Would create PR for release"
     log "[dry-run] After PR merge, would tag v$NEW_VERSION"
     log "[dry-run] Would create GitHub release"
-    log "[dry-run] Would publish to crates.io"
+    log "[dry-run] Would publish spool, spool-cli, spool-ui to crates.io"
     exit 0
 fi
 
@@ -88,26 +89,29 @@ fi
 log "Creating release branch..."
 git checkout -b "$RELEASE_BRANCH"
 
-# Update versions
-log "Updating Cargo.toml..."
+# Update workspace version
+log "Updating workspace Cargo.toml..."
 sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" Cargo.toml
 
-log "Updating src/shell.rs..."
-sed -i '' "s/spool shell v$CURRENT_VERSION/spool shell v$NEW_VERSION/" src/shell.rs
+# Update individual crate versions
+log "Updating crate versions..."
+for crate_toml in crates/*/Cargo.toml; do
+    sed -i '' "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" "$crate_toml"
+done
 
 log "Updating Cargo.lock..."
-cargo update --package spool --quiet
+cargo update --workspace --quiet
 
 # Run tests
 log "Running tests..."
-cargo test --quiet
+cargo test --workspace --quiet
 
 log "Running clippy..."
-cargo clippy --quiet -- -D warnings
+cargo clippy --workspace --quiet -- -D warnings
 
 # Commit and push
 log "Committing changes..."
-git add Cargo.toml Cargo.lock src/shell.rs
+git add Cargo.toml Cargo.lock crates/*/Cargo.toml
 git commit -m "Release v$NEW_VERSION"
 
 log "Pushing release branch..."
@@ -122,15 +126,20 @@ PR_URL=$(gh pr create \
 Bumps version from $CURRENT_VERSION to $NEW_VERSION.
 
 ### Changes
-- Updated version in Cargo.toml
-- Updated version in src/shell.rs
+- Updated workspace version in Cargo.toml
+- Updated versions in all crates
 - Updated Cargo.lock
+
+### Crates to publish
+1. \`spool\` - core library
+2. \`spool-cli\` - CLI binary
+3. \`spool-ui\` - TUI binary
 
 ### After merge
 Run \`script/release-tag $NEW_VERSION\` to:
 - Create git tag v$NEW_VERSION
 - Create GitHub release
-- Publish to crates.io" \
+- Publish all crates to crates.io" \
     --head "$RELEASE_BRANCH" \
     --base main)
 

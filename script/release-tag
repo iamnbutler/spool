@@ -13,7 +13,7 @@ usage() {
     echo "Run this after the release PR has been merged."
     echo ""
     echo "Example:"
-    echo "  script/release-tag 0.2.0"
+    echo "  script/release-tag 0.5.0"
     exit 1
 }
 
@@ -38,8 +38,8 @@ CURRENT_BRANCH=$(git branch --show-current)
 git fetch origin main
 git reset --hard origin/main
 
-# Verify version in Cargo.toml matches
-CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+# Verify version in workspace Cargo.toml matches
+CARGO_VERSION=$(grep -A5 '\[workspace.package\]' Cargo.toml | grep '^version = ' | sed 's/version = "\(.*\)"/\1/')
 if [[ "$CARGO_VERSION" != "$VERSION" ]]; then
     error "Version mismatch: Cargo.toml has $CARGO_VERSION, expected $VERSION"
 fi
@@ -57,19 +57,39 @@ gh release create "v$VERSION" \
 
 log "Publishing to crates.io..."
 echo ""
-warn "About to publish to crates.io. This cannot be undone."
+warn "About to publish all crates to crates.io. This cannot be undone."
+warn "Publishing order: spool -> spool-cli -> spool-ui"
 read -p "Continue? [y/N] " -n 1 -r
 echo ""
 
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cargo publish
-    log "Published to crates.io!"
+    log "Publishing spool..."
+    cargo publish --package spool
+
+    # Wait for crates.io to index the new version
+    log "Waiting for crates.io to index spool..."
+    sleep 30
+
+    log "Publishing spool-cli..."
+    cargo publish --package spool-cli
+
+    log "Publishing spool-ui..."
+    cargo publish --package spool-ui
+
+    log "Published all crates to crates.io!"
 else
-    warn "Skipped crates.io publish. Run 'cargo publish' manually when ready."
+    warn "Skipped crates.io publish. Run manually in order:"
+    echo "  cargo publish --package spool"
+    echo "  sleep 30"
+    echo "  cargo publish --package spool-cli"
+    echo "  cargo publish --package spool-ui"
 fi
 
 echo ""
 log "Release v$VERSION complete!"
 echo ""
 echo "  GitHub: https://github.com/iamnbutler/spool/releases/tag/v$VERSION"
-echo "  crates.io: https://crates.io/crates/spool"
+echo "  crates.io:"
+echo "    - https://crates.io/crates/spool"
+echo "    - https://crates.io/crates/spool-cli"
+echo "    - https://crates.io/crates/spool-ui"
