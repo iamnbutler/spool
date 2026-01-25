@@ -3,7 +3,10 @@
 
 [advisories]
 version = 2
-ignore = []
+ignore = [
+    # paste is unmaintained but ratatui still depends on it (transitive dep)
+    "RUSTSEC-2024-0436",
+]
 
 [licenses]
 version = 2
