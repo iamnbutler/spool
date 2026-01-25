@@ -15,13 +15,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            binary: spool
           - os: macos-latest
             target: x86_64-apple-darwin
-            binary: spool
           - os: macos-latest
             target: aarch64-apple-darwin
-            binary: spool
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -37,17 +34,28 @@ jobs:
       - name: Package
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          ARCHIVE="spool-${VERSION}-${{ matrix.target }}"
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} dist/
+
+          # Package spool CLI
+          ARCHIVE_CLI="spool-${VERSION}-${{ matrix.target }}"
+          cp target/${{ matrix.target }}/release/spool dist/
           cd dist
-          tar -czvf "${ARCHIVE}.tar.gz" ${{ matrix.binary }}
-          shasum -a 256 "${ARCHIVE}.tar.gz" > "${ARCHIVE}.tar.gz.sha256"
+          tar -czvf "${ARCHIVE_CLI}.tar.gz" spool
+          shasum -a 256 "${ARCHIVE_CLI}.tar.gz" > "${ARCHIVE_CLI}.tar.gz.sha256"
+          rm spool
+          cd ..
+
+          # Package spool-ui
+          ARCHIVE_UI="spool-ui-${VERSION}-${{ matrix.target }}"
+          cp target/${{ matrix.target }}/release/spool-ui dist/
+          cd dist
+          tar -czvf "${ARCHIVE_UI}.tar.gz" spool-ui
+          shasum -a 256 "${ARCHIVE_UI}.tar.gz" > "${ARCHIVE_UI}.tar.gz.sha256"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: spool-${{ matrix.target }}
+          name: binaries-${{ matrix.target }}
           path: dist/*.tar.gz*
 
   create-release:

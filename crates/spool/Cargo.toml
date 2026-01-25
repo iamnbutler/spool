@@ -6,8 +6,9 @@ rust-version = "1.70"
 description = "Git-native, event-sourced task management"
 license = "MIT"
 repository = "https://github.com/iamnbutler/spool"
-keywords = ["task", "git", "event-sourcing"]
-categories = ["development-tools"]
+readme = "../../README.md"
+keywords = ["task", "git", "event-sourcing", "cli"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

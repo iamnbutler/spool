@@ -6,6 +6,9 @@ rust-version = "1.70"
 description = "CLI for spool - git-native task management"
 license = "MIT"
 repository = "https://github.com/iamnbutler/spool"
+readme = "../../README.md"
+keywords = ["task", "git", "cli", "event-sourcing"]
+categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]
 name = "spool"

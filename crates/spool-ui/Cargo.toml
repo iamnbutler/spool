@@ -6,6 +6,9 @@ rust-version = "1.70"
 description = "TUI for spool - git-native task management"
 license = "MIT"
 repository = "https://github.com/iamnbutler/spool"
+readme = "README.md"
+keywords = ["task", "git", "tui", "terminal"]
+categories = ["development-tools", "command-line-utilities"]
 
 [[bin]]
 name = "spool-ui"
