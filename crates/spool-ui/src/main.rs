@@ -5,7 +5,9 @@ use std::io;
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -47,6 +49,11 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
 
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
+                // Ctrl+C quits from any mode
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                    return Ok(());
+                }
+
                 // Clear message on any keypress
                 app.clear_message();
 
@@ -72,7 +79,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                             if app.history_show_detail {
                                 app.close_history_detail();
                             } else {
-                                app.toggle_history_view();
+                                return Ok(());
                             }
                         }
                         KeyCode::Char('j') | KeyCode::Down => {
@@ -131,7 +138,13 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('s') => app.cycle_sort(),
                         KeyCode::Char('S') => app.cycle_stream_filter(),
                         KeyCode::Char('/') => app.toggle_search(),
-                        KeyCode::Esc => app.clear_search(),
+                        KeyCode::Esc => {
+                            if app.search_query.is_empty() {
+                                return Ok(());
+                            } else {
+                                app.clear_search();
+                            }
+                        }
                         // Task editing
                         KeyCode::Char('c') => app.complete_selected_task(),
                         KeyCode::Char('r') => app.reopen_selected_task(),
