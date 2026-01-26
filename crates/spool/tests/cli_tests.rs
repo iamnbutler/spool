@@ -28,6 +28,7 @@ fn test_cli_parse_list_defaults() {
         tag,
         priority,
         stream,
+        stream_name,
         no_stream,
         format,
     } = cli.command
@@ -37,6 +38,7 @@ fn test_cli_parse_list_defaults() {
         assert!(tag.is_none());
         assert!(priority.is_none());
         assert!(stream.is_none());
+        assert!(stream_name.is_none());
         assert!(!no_stream);
         assert_eq!(format, "table");
     } else {
