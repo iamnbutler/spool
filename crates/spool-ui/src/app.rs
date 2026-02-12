@@ -78,6 +78,7 @@ pub struct App {
     pub input_mode: InputMode,
     pub input_buffer: String,
     pub message: Option<String>,
+    pub pending_quit: bool,
     pub detail_scroll: u16,
     pub detail_content_height: u16, // set by UI during render
     pub detail_visible_height: u16, // set by UI during render
@@ -138,6 +139,7 @@ impl App {
             input_mode: InputMode::Normal,
             input_buffer: String::new(),
             message: None,
+            pending_quit: false,
             detail_scroll: 0,
             detail_content_height: 0,
             detail_visible_height: 0,
@@ -460,6 +462,18 @@ impl App {
 
     pub fn clear_message(&mut self) {
         self.message = None;
+        self.pending_quit = false;
+    }
+
+    /// Returns true if should quit, false if showing confirmation
+    pub fn request_quit(&mut self) -> bool {
+        if self.pending_quit {
+            true
+        } else {
+            self.pending_quit = true;
+            self.message = Some("Press Esc again to quit".to_string());
+            false
+        }
     }
 
     // View navigation methods

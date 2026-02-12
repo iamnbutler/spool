@@ -103,7 +103,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Esc => {
                             if app.history_show_detail {
                                 app.close_history_detail();
-                            } else {
+                            } else if app.request_quit() {
                                 return Ok(());
                             }
                         }
@@ -174,10 +174,13 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('s') => app.toggle_streams_view(),
                         KeyCode::Char('/') => app.toggle_search(),
                         KeyCode::Esc => {
-                            if app.search_query.is_empty() {
-                                return Ok(());
-                            } else {
+                            if !app.search_query.is_empty() {
                                 app.clear_search();
+                            } else if app.stream_filter.is_some() {
+                                app.stream_filter = None;
+                                let _ = app.reload_tasks();
+                            } else if app.request_quit() {
+                                return Ok(());
                             }
                         }
                         // Task editing
