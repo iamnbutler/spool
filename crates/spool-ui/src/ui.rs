@@ -46,6 +46,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             | InputMode::EditTaskPriority
             | InputMode::EditStreamName
             | InputMode::AssignTask
+            | InputMode::EditField
+            | InputMode::SelectStream
     );
     let show_bar = has_message || in_input_mode;
 
@@ -86,6 +88,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if app.show_edit_menu {
         draw_edit_menu(f, app);
+    }
+    if app.input_mode == InputMode::SelectStream {
+        draw_stream_picker(f, app);
     }
 }
 
@@ -342,63 +347,115 @@ fn build_empty_tasks_message(app: &App) -> Line<'static> {
 }
 
 fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
-    let border_style = if app.focus == Focus::Detail {
+    use crate::app::DetailField;
+
+    let is_detail_focused = app.focus == Focus::Detail;
+    let border_style = if is_detail_focused {
         Style::default().fg(Color::Cyan)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
+    let selected_field = if is_detail_focused {
+        app.current_detail_field()
+    } else {
+        None
+    };
+
+    // Helper to check if a field is selected and return appropriate style
+    let field_style = |field: DetailField, base_style: Style| -> Style {
+        if selected_field == Some(field) {
+            base_style.bg(Color::DarkGray).fg(Color::White)
+        } else {
+            base_style
+        }
+    };
+
+    let label_style = |field: DetailField| -> Style {
+        if selected_field == Some(field) {
+            Style::default().bg(Color::DarkGray).fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::DarkGray)
+        }
+    };
+
     let content = if let Some(task) = app.selected_task() {
         let mut lines = vec![
+            // ID (non-editable)
             Line::from(vec![
                 Span::styled("ID: ", Style::default().fg(Color::DarkGray)),
                 Span::raw(&task.id),
             ]),
+            // Title (editable)
             Line::from(vec![
-                Span::styled("Title: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(&task.title, Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled("Title: ", label_style(DetailField::Title)),
+                Span::styled(
+                    &task.title,
+                    field_style(
+                        DetailField::Title,
+                        Style::default().add_modifier(Modifier::BOLD),
+                    ),
+                ),
             ]),
+            // Status (cycleable)
             Line::from(vec![
-                Span::styled("Status: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("Status: ", label_style(DetailField::Status)),
                 Span::styled(
                     format!("{:?}", task.status),
-                    match task.status {
-                        spool::state::TaskStatus::Open => Style::default().fg(Color::Yellow),
-                        spool::state::TaskStatus::Complete => Style::default().fg(Color::Green),
-                    },
+                    field_style(
+                        DetailField::Status,
+                        match task.status {
+                            spool::state::TaskStatus::Open => Style::default().fg(Color::Yellow),
+                            spool::state::TaskStatus::Complete => Style::default().fg(Color::Green),
+                        },
+                    ),
+                ),
+            ]),
+            // Priority (editable)
+            Line::from(vec![
+                Span::styled("Priority: ", label_style(DetailField::Priority)),
+                Span::styled(
+                    task.priority.as_deref().unwrap_or("-"),
+                    field_style(
+                        DetailField::Priority,
+                        task.priority
+                            .as_ref()
+                            .map(|p| priority_style(p))
+                            .unwrap_or_default(),
+                    ),
+                ),
+            ]),
+            // Assignee (editable)
+            Line::from(vec![
+                Span::styled("Assignee: ", label_style(DetailField::Assignee)),
+                Span::styled(
+                    task.assignee.as_deref().unwrap_or("-"),
+                    field_style(DetailField::Assignee, Style::default().fg(Color::Cyan)),
                 ),
             ]),
         ];
 
-        if let Some(p) = &task.priority {
-            lines.push(Line::from(vec![
-                Span::styled("Priority: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(p, priority_style(p)),
-            ]));
-        }
+        // Stream (selectable)
+        let stream_name = task
+            .stream
+            .as_ref()
+            .and_then(|id| app.get_stream(id))
+            .map(|s| s.name.as_str())
+            .or(task.stream.as_deref())
+            .unwrap_or("-");
+        lines.push(Line::from(vec![
+            Span::styled("Stream: ", label_style(DetailField::Stream)),
+            Span::styled(
+                stream_name,
+                field_style(DetailField::Stream, Style::default().fg(Color::Blue)),
+            ),
+        ]));
 
-        if let Some(assignee) = &task.assignee {
-            lines.push(Line::from(vec![
-                Span::styled("Assignee: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(assignee, Style::default().fg(Color::Cyan)),
-            ]));
-        }
-
+        // Tags (non-editable for now)
         if !task.tags.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("Tags: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(task.tags.join(", "), Style::default().fg(Color::Magenta)),
-            ]));
-        }
-
-        if let Some(stream_id) = &task.stream {
-            let stream_name = app
-                .get_stream(stream_id)
-                .map(|s| s.name.as_str())
-                .unwrap_or(stream_id);
-            lines.push(Line::from(vec![
-                Span::styled("Stream: ", Style::default().fg(Color::DarkGray)),
-                Span::styled(stream_name, Style::default().fg(Color::Blue)),
             ]));
         }
 
@@ -458,7 +515,11 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
         vec![Line::from("No task selected")]
     };
 
-    let title = " Detail ";
+    let title = if is_detail_focused {
+        " Detail (j/k:nav  Enter:edit) "
+    } else {
+        " Detail "
+    };
 
     // Update scroll bounds (area height minus borders)
     let content_height = content.len() as u16;
@@ -972,6 +1033,18 @@ fn draw_input_bar(f: &mut Frame, area: Rect, app: &App) {
             Span::raw(&app.input_buffer),
             Span::styled("▌", Style::default().fg(Color::Cyan)),
         ]),
+        InputMode::EditField => {
+            // Get the field being edited
+            let field_label = app.editing_field.map(|f| f.label()).unwrap_or("Field");
+            Line::from(vec![
+                Span::styled(format!(" Edit {}: ", field_label), Style::default().fg(Color::Cyan)),
+                Span::raw(&app.input_buffer),
+                Span::styled("▌", Style::default().fg(Color::Cyan)),
+            ])
+        }
+        InputMode::SelectStream => Line::from(vec![
+            Span::styled(" Select stream (j/k:nav  Enter:select  Esc:cancel)", Style::default().fg(Color::Cyan)),
+        ]),
         InputMode::Normal => {
             if let Some(msg) = &app.message {
                 Line::from(vec![Span::styled(
@@ -1017,7 +1090,16 @@ fn draw_help_overlay(f: &mut Frame) {
         Line::from("  j/k, ↑/↓     Move up/down"),
         Line::from("  g/G          Jump to first/last"),
         Line::from("  [/], ⌥←/→    Previous/next view"),
-        Line::from("  Tab          Toggle detail panel"),
+        Line::from("  Tab          Toggle detail panel focus"),
+        Line::from("  Enter        Show detail / edit field"),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            "Detail View (when focused)",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]),
+        Line::from("  j/k          Move between fields"),
+        Line::from("  Enter        Edit / cycle field"),
+        Line::from("  Esc          Return to task list"),
         Line::from(""),
         Line::from(vec![Span::styled(
             "Tasks",
@@ -1155,13 +1237,54 @@ fn draw_edit_menu(f: &mut Frame, app: &App) {
     f.render_widget(list, popup_area);
 }
 
+fn draw_stream_picker(f: &mut Frame, app: &App) {
+    let area = f.area();
+
+    // Calculate centered popup area
+    let popup_width = 35.min(area.width.saturating_sub(4));
+    let options = app.stream_picker_options();
+    let popup_height = (options.len() as u16 + 2).min(area.height.saturating_sub(4));
+    let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    // Clear the area behind the popup
+    f.render_widget(ratatui::widgets::Clear, popup_area);
+
+    let items: Vec<ListItem> = options
+        .iter()
+        .map(|(_, name, is_selected)| {
+            let style = if *is_selected {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            ListItem::new(format!("  {}", name)).style(style)
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Blue))
+            .title(" Select Stream "),
+    );
+
+    f.render_widget(list, popup_area);
+}
+
 fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
     let (left_help, right_help) = match app.input_mode {
         InputMode::NewTask | InputMode::NewStream => (" Enter:create  Esc:cancel", ""),
         InputMode::EditTaskTitle
         | InputMode::EditTaskPriority
         | InputMode::EditStreamName
-        | InputMode::AssignTask => (" Enter:save  Esc:cancel", ""),
+        | InputMode::AssignTask
+        | InputMode::EditField => (" Enter:save  Esc:cancel", ""),
+        InputMode::SelectStream => (" j/k:nav  Enter:select  Esc:cancel", ""),
         InputMode::Normal if app.search_mode => (" Type to search  Enter/Esc:close", ""),
         InputMode::Normal => match app.view {
             View::Tasks => (

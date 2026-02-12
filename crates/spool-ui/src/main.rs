@@ -171,6 +171,20 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char(c) => app.input_char(c),
                         _ => {}
                     },
+                    InputMode::EditField => match key.code {
+                        KeyCode::Esc => app.cancel_detail_edit(),
+                        KeyCode::Enter => app.submit_detail_edit(),
+                        KeyCode::Backspace => app.input_backspace(),
+                        KeyCode::Char(c) => app.input_char(c),
+                        _ => {}
+                    },
+                    InputMode::SelectStream => match key.code {
+                        KeyCode::Esc => app.cancel_stream_picker(),
+                        KeyCode::Enter => app.select_stream_from_picker(),
+                        KeyCode::Char('j') | KeyCode::Down => app.stream_picker_next(),
+                        KeyCode::Char('k') | KeyCode::Up => app.stream_picker_previous(),
+                        _ => {}
+                    },
                     InputMode::Normal if app.search_mode => match key.code {
                         KeyCode::Esc => app.toggle_search(),
                         KeyCode::Enter => app.toggle_search(),
@@ -243,14 +257,14 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('q') => return Ok(()),
                         KeyCode::Char('j') | KeyCode::Down => {
                             if app.focus == app::Focus::Detail {
-                                app.scroll_detail_down();
+                                app.detail_field_next();
                             } else {
                                 app.next_task();
                             }
                         }
                         KeyCode::Char('k') | KeyCode::Up => {
                             if app.focus == app::Focus::Detail {
-                                app.scroll_detail_up();
+                                app.detail_field_previous();
                             } else {
                                 app.previous_task();
                             }
@@ -258,13 +272,21 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('g') => app.first_task(),
                         KeyCode::Char('G') => app.last_task(),
                         KeyCode::Tab => app.toggle_focus(),
-                        KeyCode::Enter => app.toggle_detail(),
+                        KeyCode::Enter => {
+                            if app.focus == app::Focus::Detail && app.show_detail {
+                                app.start_detail_edit();
+                            } else {
+                                app.toggle_detail();
+                            }
+                        }
                         KeyCode::Char('v') => app.cycle_status_filter(),
                         KeyCode::Char('o') => app.cycle_sort(),
                         KeyCode::Char('s') => app.toggle_streams_view(),
                         KeyCode::Char('/') => app.toggle_search(),
                         KeyCode::Esc => {
-                            if !app.search_query.is_empty() {
+                            if app.focus == app::Focus::Detail {
+                                app.focus = app::Focus::TaskList;
+                            } else if !app.search_query.is_empty() {
                                 app.clear_search();
                             } else if app.stream_filter.is_some() {
                                 app.stream_filter = None;
@@ -277,7 +299,15 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('c') => app.complete_selected_task(),
                         KeyCode::Char('r') => app.reopen_selected_task(),
                         KeyCode::Char('n') => app.start_new_task(),
-                        KeyCode::Char('e') => app.show_task_edit_menu(),
+                        KeyCode::Char('e') => {
+                            if app.show_detail {
+                                // In detail view, start editing selected field
+                                app.focus = app::Focus::Detail;
+                                app.start_detail_edit();
+                            } else {
+                                app.show_task_edit_menu();
+                            }
+                        }
                         KeyCode::Char('a') => app.claim_selected_task(),
                         KeyCode::Char('A') => app.start_assign_task(),
                         KeyCode::Char('u') => app.free_selected_task(),

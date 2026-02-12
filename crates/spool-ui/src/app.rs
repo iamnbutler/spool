@@ -77,6 +77,39 @@ pub enum InputMode {
     EditTaskPriority,
     EditStreamName,
     AssignTask,
+    EditField,      // Editing a field in detail view (text input)
+    SelectStream,   // Selecting a stream from picker
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetailField {
+    Title,
+    Status,
+    Priority,
+    Assignee,
+    Stream,
+}
+
+impl DetailField {
+    pub fn all() -> &'static [DetailField] {
+        &[
+            DetailField::Title,
+            DetailField::Status,
+            DetailField::Priority,
+            DetailField::Assignee,
+            DetailField::Stream,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            DetailField::Title => "Title",
+            DetailField::Status => "Status",
+            DetailField::Priority => "Priority",
+            DetailField::Assignee => "Assignee",
+            DetailField::Stream => "Stream",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,11 +161,16 @@ pub struct App {
     pub show_help: bool,
     pub show_command_palette: bool,
     pub command_selected: usize,
+    pub pending_delete_stream: Option<String>, // stream ID pending deletion
+    // Edit menu state (old popup approach - keeping for compatibility)
     pub show_edit_menu: bool,
     pub edit_field_selected: usize,
     pub editing_task_id: Option<String>,
     pub editing_stream_id: Option<String>,
-    pub pending_delete_stream: Option<String>, // stream ID pending deletion
+    // Detail editing state (new inline approach)
+    pub detail_field_selected: usize,    // which field is highlighted in detail view
+    pub editing_field: Option<DetailField>, // which field is being edited
+    pub stream_picker_selected: usize,   // for stream selection
     pub detail_scroll: u16,
     pub detail_content_height: u16, // set by UI during render
     pub detail_visible_height: u16, // set by UI during render
@@ -205,11 +243,14 @@ impl App {
             show_help: false,
             show_command_palette: false,
             command_selected: 0,
+            pending_delete_stream: None,
             show_edit_menu: false,
             edit_field_selected: 0,
             editing_task_id: None,
             editing_stream_id: None,
-            pending_delete_stream: None,
+            detail_field_selected: 0,
+            editing_field: Option::None,
+            stream_picker_selected: 0,
             detail_scroll: 0,
             detail_content_height: 0,
             detail_visible_height: 0,
@@ -1083,5 +1124,244 @@ impl App {
 
     pub fn get_task(&self, id: &str) -> Option<&Task> {
         self.all_tasks.get(id)
+    }
+
+    // Detail view editing methods
+
+    /// Navigate to next field in detail view
+    pub fn detail_field_next(&mut self) {
+        let fields = DetailField::all();
+        if !fields.is_empty() {
+            self.detail_field_selected = (self.detail_field_selected + 1) % fields.len();
+        }
+    }
+
+    /// Navigate to previous field in detail view
+    pub fn detail_field_previous(&mut self) {
+        let fields = DetailField::all();
+        if !fields.is_empty() {
+            if self.detail_field_selected == 0 {
+                self.detail_field_selected = fields.len() - 1;
+            } else {
+                self.detail_field_selected -= 1;
+            }
+        }
+    }
+
+    /// Get the currently selected detail field
+    pub fn current_detail_field(&self) -> Option<DetailField> {
+        DetailField::all().get(self.detail_field_selected).copied()
+    }
+
+    /// Start editing the currently selected field in detail view
+    pub fn start_detail_edit(&mut self) {
+        // Extract task data first to avoid borrow issues
+        let task_data = self.selected_task().map(|t| {
+            (
+                t.id.clone(),
+                t.title.clone(),
+                t.priority.clone(),
+                t.assignee.clone(),
+                t.stream.clone(),
+            )
+        });
+
+        let Some((task_id, title, priority, assignee, stream)) = task_data else {
+            return;
+        };
+
+        let field = self.current_detail_field();
+
+        match field {
+            Some(DetailField::Status) => {
+                // Cycle status directly instead of editing
+                self.cycle_task_status();
+            }
+            Some(DetailField::Stream) => {
+                // Open stream picker
+                self.editing_task_id = Some(task_id);
+                self.stream_picker_selected = 0;
+                // Find current stream index
+                if let Some(ref stream_id) = stream {
+                    if let Some(pos) = self.stream_ids.iter().position(|s| s == stream_id) {
+                        self.stream_picker_selected = pos + 1; // +1 for "None" option
+                    }
+                }
+                self.input_mode = InputMode::SelectStream;
+            }
+            Some(DetailField::Title) => {
+                self.editing_task_id = Some(task_id);
+                self.editing_field = Some(DetailField::Title);
+                self.input_buffer = title;
+                self.input_mode = InputMode::EditField;
+            }
+            Some(DetailField::Priority) => {
+                self.editing_task_id = Some(task_id);
+                self.editing_field = Some(DetailField::Priority);
+                self.input_buffer = priority.unwrap_or_default();
+                self.input_mode = InputMode::EditField;
+            }
+            Some(DetailField::Assignee) => {
+                self.editing_task_id = Some(task_id);
+                self.editing_field = Some(DetailField::Assignee);
+                self.input_buffer = assignee.unwrap_or_default();
+                self.input_mode = InputMode::EditField;
+            }
+            None => {}
+        }
+    }
+
+    /// Cycle task status (open <-> complete)
+    fn cycle_task_status(&mut self) {
+        if let Some(task) = self.selected_task() {
+            if task.status == TaskStatus::Open {
+                self.complete_selected_task();
+            } else {
+                self.reopen_selected_task();
+            }
+        }
+    }
+
+    /// Cancel detail field editing
+    pub fn cancel_detail_edit(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+        self.editing_field = None;
+        self.editing_task_id = None;
+    }
+
+    /// Submit the current detail field edit
+    pub fn submit_detail_edit(&mut self) {
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        if let Some(task_id) = self.editing_task_id.take() {
+            let result = match self.editing_field {
+                Some(DetailField::Title) => {
+                    if self.input_buffer.trim().is_empty() {
+                        self.message = Some("Title cannot be empty".to_string());
+                        self.input_mode = InputMode::Normal;
+                        self.editing_field = None;
+                        return;
+                    }
+                    writer::update_task(
+                        &self.ctx,
+                        &task_id,
+                        Some(self.input_buffer.trim()),
+                        None,
+                        None,
+                        &by,
+                        &branch,
+                    )
+                }
+                Some(DetailField::Priority) => {
+                    let priority = if self.input_buffer.trim().is_empty() {
+                        None
+                    } else {
+                        Some(self.input_buffer.trim())
+                    };
+                    writer::update_task(&self.ctx, &task_id, None, None, priority, &by, &branch)
+                }
+                Some(DetailField::Assignee) => {
+                    let assignee = if self.input_buffer.trim().is_empty() {
+                        None
+                    } else {
+                        Some(self.input_buffer.trim())
+                    };
+                    writer::assign_task(&self.ctx, &task_id, assignee, &by, &branch)
+                }
+                _ => Ok(()),
+            };
+
+            match result {
+                Ok(()) => {
+                    self.message = Some("Updated".to_string());
+                    let _ = self.reload_tasks();
+                    if self.show_detail {
+                        let _ = self.load_task_events();
+                    }
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+        self.editing_field = None;
+    }
+
+    // Stream picker methods
+
+    /// Cancel stream picker
+    pub fn cancel_stream_picker(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.editing_task_id = None;
+    }
+
+    /// Move to next stream in picker
+    pub fn stream_picker_next(&mut self) {
+        // +1 for "None" option at start
+        let max_index = self.stream_ids.len();
+        self.stream_picker_selected = (self.stream_picker_selected + 1).min(max_index);
+    }
+
+    /// Move to previous stream in picker
+    pub fn stream_picker_previous(&mut self) {
+        self.stream_picker_selected = self.stream_picker_selected.saturating_sub(1);
+    }
+
+    /// Select the current stream from picker
+    pub fn select_stream_from_picker(&mut self) {
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        if let Some(task_id) = self.editing_task_id.take() {
+            // Index 0 = None, 1+ = stream_ids[index-1]
+            let stream_id = if self.stream_picker_selected == 0 {
+                None
+            } else {
+                self.stream_ids.get(self.stream_picker_selected - 1).cloned()
+            };
+
+            match writer::set_stream(&self.ctx, &task_id, stream_id.as_deref(), &by, &branch) {
+                Ok(()) => {
+                    let msg = match &stream_id {
+                        Some(id) => {
+                            let name = self.streams.get(id).map(|s| s.name.as_str()).unwrap_or(id);
+                            format!("Stream set to {}", name)
+                        }
+                        None => "Stream removed".to_string(),
+                    };
+                    self.message = Some(msg);
+                    let _ = self.reload_tasks();
+                    if self.show_detail {
+                        let _ = self.load_task_events();
+                    }
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+    }
+
+    /// Get stream picker options: (index, name, is_selected)
+    pub fn stream_picker_options(&self) -> Vec<(usize, String, bool)> {
+        let mut options = vec![(0, "None".to_string(), self.stream_picker_selected == 0)];
+
+        for (i, stream_id) in self.stream_ids.iter().enumerate() {
+            let name = self
+                .streams
+                .get(stream_id)
+                .map(|s| s.name.clone())
+                .unwrap_or_else(|| stream_id.clone());
+            options.push((i + 1, name, self.stream_picker_selected == i + 1));
+        }
+
+        options
     }
 }
