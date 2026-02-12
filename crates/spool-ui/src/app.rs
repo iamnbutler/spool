@@ -73,6 +73,29 @@ pub enum InputMode {
     Normal,
     NewTask,
     NewStream,
+    EditTaskTitle,
+    EditTaskPriority,
+    EditStreamName,
+    AssignTask,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditField {
+    Title,
+    Priority,
+}
+
+impl EditField {
+    pub fn all() -> &'static [EditField] {
+        &[EditField::Title, EditField::Priority]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            EditField::Title => "Title",
+            EditField::Priority => "Priority",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +128,10 @@ pub struct App {
     pub show_help: bool,
     pub show_command_palette: bool,
     pub command_selected: usize,
+    pub show_edit_menu: bool,
+    pub edit_field_selected: usize,
+    pub editing_task_id: Option<String>,
+    pub editing_stream_id: Option<String>,
     pub pending_delete_stream: Option<String>, // stream ID pending deletion
     pub detail_scroll: u16,
     pub detail_content_height: u16, // set by UI during render
@@ -178,6 +205,10 @@ impl App {
             show_help: false,
             show_command_palette: false,
             command_selected: 0,
+            show_edit_menu: false,
+            edit_field_selected: 0,
+            editing_task_id: None,
+            editing_stream_id: None,
             pending_delete_stream: None,
             detail_scroll: 0,
             detail_content_height: 0,
@@ -450,6 +481,186 @@ impl App {
         }
     }
 
+    // Task edit menu
+    pub fn show_task_edit_menu(&mut self) {
+        if let Some(task) = self.selected_task() {
+            self.editing_task_id = Some(task.id.clone());
+            self.show_edit_menu = true;
+            self.edit_field_selected = 0;
+        }
+    }
+
+    pub fn close_edit_menu(&mut self) {
+        self.show_edit_menu = false;
+        self.editing_task_id = None;
+        self.editing_stream_id = None;
+        self.edit_field_selected = 0;
+    }
+
+    pub fn edit_menu_next(&mut self) {
+        let fields = EditField::all();
+        if !fields.is_empty() {
+            self.edit_field_selected = (self.edit_field_selected + 1).min(fields.len() - 1);
+        }
+    }
+
+    pub fn edit_menu_previous(&mut self) {
+        self.edit_field_selected = self.edit_field_selected.saturating_sub(1);
+    }
+
+    pub fn start_editing_selected_field(&mut self) {
+        let fields = EditField::all();
+        if let Some(field) = fields.get(self.edit_field_selected) {
+            if let Some(task_id) = &self.editing_task_id {
+                // Get current value
+                let current_value = if let Some(task) = self.all_tasks.get(task_id) {
+                    match field {
+                        EditField::Title => task.title.clone(),
+                        EditField::Priority => task.priority.clone().unwrap_or_default(),
+                    }
+                } else {
+                    String::new()
+                };
+
+                self.input_buffer = current_value;
+                self.show_edit_menu = false;
+                self.input_mode = match field {
+                    EditField::Title => InputMode::EditTaskTitle,
+                    EditField::Priority => InputMode::EditTaskPriority,
+                };
+            }
+        }
+    }
+
+    pub fn submit_task_edit(&mut self) {
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        if let Some(task_id) = self.editing_task_id.take() {
+            let result = match self.input_mode {
+                InputMode::EditTaskTitle => {
+                    if self.input_buffer.trim().is_empty() {
+                        self.message = Some("Title cannot be empty".to_string());
+                        self.input_mode = InputMode::Normal;
+                        return;
+                    }
+                    writer::update_task(
+                        &self.ctx,
+                        &task_id,
+                        Some(self.input_buffer.trim()),
+                        None,
+                        None,
+                        &by,
+                        &branch,
+                    )
+                }
+                InputMode::EditTaskPriority => {
+                    let priority = if self.input_buffer.trim().is_empty() {
+                        None
+                    } else {
+                        Some(self.input_buffer.trim())
+                    };
+                    writer::update_task(&self.ctx, &task_id, None, None, priority, &by, &branch)
+                }
+                _ => Ok(()),
+            };
+
+            match result {
+                Ok(()) => {
+                    self.message = Some("Task updated".to_string());
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
+    // Task assignment
+    pub fn claim_selected_task(&mut self) {
+        if let Some(task) = self.selected_task() {
+            let id = task.id.clone();
+            let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+            let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+            match writer::assign_task(&self.ctx, &id, Some(&by), &by, &branch) {
+                Ok(()) => {
+                    self.message = Some(format!("Claimed: {}", id));
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    pub fn free_selected_task(&mut self) {
+        if let Some(task) = self.selected_task() {
+            if task.assignee.is_none() {
+                self.message = Some("Task not assigned".to_string());
+                return;
+            }
+            let id = task.id.clone();
+            let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+            let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+            match writer::assign_task(&self.ctx, &id, None, &by, &branch) {
+                Ok(()) => {
+                    self.message = Some(format!("Unassigned: {}", id));
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+    }
+
+    pub fn start_assign_task(&mut self) {
+        if let Some(task) = self.selected_task() {
+            let task_id = task.id.clone();
+            let assignee = task.assignee.clone().unwrap_or_default();
+            self.editing_task_id = Some(task_id);
+            self.input_buffer = assignee;
+            self.input_mode = InputMode::AssignTask;
+        }
+    }
+
+    pub fn submit_assign_task(&mut self) {
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        if let Some(task_id) = self.editing_task_id.take() {
+            let assignee = if self.input_buffer.trim().is_empty() {
+                None
+            } else {
+                Some(self.input_buffer.trim())
+            };
+
+            match writer::assign_task(&self.ctx, &task_id, assignee, &by, &branch) {
+                Ok(()) => {
+                    let msg = match assignee {
+                        Some(a) => format!("Assigned to {}", a),
+                        None => "Unassigned".to_string(),
+                    };
+                    self.message = Some(msg);
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
     pub fn start_new_task(&mut self) {
         self.input_mode = InputMode::NewTask;
         self.input_buffer.clear();
@@ -684,6 +895,49 @@ impl App {
             }
             Err(e) => {
                 self.message = Some(format!("Error: {}", e));
+            }
+        }
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
+    pub fn start_edit_stream(&mut self) {
+        if let Some(stream_id) = self.stream_ids.get(self.streams_selected).cloned() {
+            if let Some(stream) = self.streams.get(&stream_id) {
+                self.editing_stream_id = Some(stream_id);
+                self.input_buffer = stream.name.clone();
+                self.input_mode = InputMode::EditStreamName;
+            }
+        }
+    }
+
+    pub fn submit_stream_edit(&mut self) {
+        let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
+        let branch = writer::get_current_branch().unwrap_or_else(|_| "main".to_string());
+
+        if let Some(stream_id) = self.editing_stream_id.take() {
+            if self.input_buffer.trim().is_empty() {
+                self.message = Some("Name cannot be empty".to_string());
+                self.input_mode = InputMode::Normal;
+                return;
+            }
+
+            match writer::update_stream(
+                &self.ctx,
+                &stream_id,
+                Some(self.input_buffer.trim()),
+                None,
+                &by,
+                &branch,
+            ) {
+                Ok(()) => {
+                    self.message = Some("Stream updated".to_string());
+                    let _ = self.reload_tasks();
+                }
+                Err(e) => {
+                    self.message = Some(format!("Error: {}", e));
+                }
             }
         }
 

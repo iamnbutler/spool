@@ -122,6 +122,19 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                     continue;
                 }
 
+                // Edit menu handling
+                if app.show_edit_menu {
+                    match key.code {
+                        KeyCode::Esc => app.close_edit_menu(),
+                        KeyCode::Char('j') | KeyCode::Down => app.edit_menu_next(),
+                        KeyCode::Char('k') | KeyCode::Up => app.edit_menu_previous(),
+                        KeyCode::Enter => app.start_editing_selected_field(),
+                        KeyCode::Char('e') => app.close_edit_menu(),
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 match app.input_mode {
                     InputMode::NewTask => match key.code {
                         KeyCode::Esc => app.cancel_input(),
@@ -133,6 +146,27 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                     InputMode::NewStream => match key.code {
                         KeyCode::Esc => app.cancel_input(),
                         KeyCode::Enter => app.submit_new_stream(),
+                        KeyCode::Backspace => app.input_backspace(),
+                        KeyCode::Char(c) => app.input_char(c),
+                        _ => {}
+                    },
+                    InputMode::EditTaskTitle | InputMode::EditTaskPriority => match key.code {
+                        KeyCode::Esc => app.cancel_input(),
+                        KeyCode::Enter => app.submit_task_edit(),
+                        KeyCode::Backspace => app.input_backspace(),
+                        KeyCode::Char(c) => app.input_char(c),
+                        _ => {}
+                    },
+                    InputMode::EditStreamName => match key.code {
+                        KeyCode::Esc => app.cancel_input(),
+                        KeyCode::Enter => app.submit_stream_edit(),
+                        KeyCode::Backspace => app.input_backspace(),
+                        KeyCode::Char(c) => app.input_char(c),
+                        _ => {}
+                    },
+                    InputMode::AssignTask => match key.code {
+                        KeyCode::Esc => app.cancel_input(),
+                        KeyCode::Enter => app.submit_assign_task(),
                         KeyCode::Backspace => app.input_backspace(),
                         KeyCode::Char(c) => app.input_char(c),
                         _ => {}
@@ -194,6 +228,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('G') => app.streams_last(),
                         KeyCode::Enter => app.select_current_stream(),
                         KeyCode::Char('n') => app.start_new_stream(),
+                        KeyCode::Char('e') => app.start_edit_stream(),
                         KeyCode::Char('d') => {
                             if app.pending_delete_stream.is_some() {
                                 app.confirm_delete_stream();
@@ -242,6 +277,10 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Char('c') => app.complete_selected_task(),
                         KeyCode::Char('r') => app.reopen_selected_task(),
                         KeyCode::Char('n') => app.start_new_task(),
+                        KeyCode::Char('e') => app.show_task_edit_menu(),
+                        KeyCode::Char('a') => app.claim_selected_task(),
+                        KeyCode::Char('A') => app.start_assign_task(),
+                        KeyCode::Char('u') => app.free_selected_task(),
                         KeyCode::Char('h') => app.toggle_history_view(),
                         _ => {}
                     },

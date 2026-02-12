@@ -38,8 +38,15 @@ fn operation_color(op: &str) -> Color {
 pub fn draw(f: &mut Frame, app: &mut App) {
     // Determine if we need a message/input bar
     let has_message = app.message.is_some();
-    let in_input_mode =
-        app.input_mode == InputMode::NewTask || app.input_mode == InputMode::NewStream;
+    let in_input_mode = matches!(
+        app.input_mode,
+        InputMode::NewTask
+            | InputMode::NewStream
+            | InputMode::EditTaskTitle
+            | InputMode::EditTaskPriority
+            | InputMode::EditStreamName
+            | InputMode::AssignTask
+    );
     let show_bar = has_message || in_input_mode;
 
     let chunks = Layout::default()
@@ -76,6 +83,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
     if app.show_command_palette {
         draw_command_palette(f, app);
+    }
+    if app.show_edit_menu {
+        draw_edit_menu(f, app);
     }
 }
 
@@ -939,6 +949,29 @@ fn draw_input_bar(f: &mut Frame, area: Rect, app: &App) {
             Span::raw(&app.input_buffer),
             Span::styled("▌", Style::default().fg(Color::Cyan)),
         ]),
+        InputMode::EditTaskTitle => Line::from(vec![
+            Span::styled(" Edit title: ", Style::default().fg(Color::Cyan)),
+            Span::raw(&app.input_buffer),
+            Span::styled("▌", Style::default().fg(Color::Cyan)),
+        ]),
+        InputMode::EditTaskPriority => Line::from(vec![
+            Span::styled(" Edit priority (p0-p3): ", Style::default().fg(Color::Cyan)),
+            Span::raw(&app.input_buffer),
+            Span::styled("▌", Style::default().fg(Color::Cyan)),
+        ]),
+        InputMode::EditStreamName => Line::from(vec![
+            Span::styled(" Edit name: ", Style::default().fg(Color::Cyan)),
+            Span::raw(&app.input_buffer),
+            Span::styled("▌", Style::default().fg(Color::Cyan)),
+        ]),
+        InputMode::AssignTask => Line::from(vec![
+            Span::styled(
+                " Assign to (@user, empty to unassign): ",
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::raw(&app.input_buffer),
+            Span::styled("▌", Style::default().fg(Color::Cyan)),
+        ]),
         InputMode::Normal => {
             if let Some(msg) = &app.message {
                 Line::from(vec![Span::styled(
@@ -991,8 +1024,12 @@ fn draw_help_overlay(f: &mut Frame) {
             Style::default().add_modifier(Modifier::BOLD),
         )]),
         Line::from("  n            New task"),
+        Line::from("  e            Edit task"),
         Line::from("  c            Complete task"),
         Line::from("  r            Reopen task"),
+        Line::from("  a            Claim task"),
+        Line::from("  A            Assign to user"),
+        Line::from("  u            Unassign task"),
         Line::from("  v            Cycle status filter"),
         Line::from("  o            Cycle sort order"),
         Line::from("  /            Search"),
@@ -1002,6 +1039,7 @@ fn draw_help_overlay(f: &mut Frame) {
             Style::default().add_modifier(Modifier::BOLD),
         )]),
         Line::from("  n            New stream"),
+        Line::from("  e            Edit stream"),
         Line::from("  d            Delete stream"),
         Line::from("  Enter        View stream tasks"),
         Line::from(""),
@@ -1075,16 +1113,65 @@ fn draw_command_palette(f: &mut Frame, app: &App) {
     f.render_widget(list, popup_area);
 }
 
+fn draw_edit_menu(f: &mut Frame, app: &App) {
+    use crate::app::EditField;
+
+    let area = f.area();
+
+    // Calculate centered popup area
+    let popup_width = 25.min(area.width.saturating_sub(4));
+    let popup_height = 6.min(area.height.saturating_sub(4));
+    let popup_x = (area.width.saturating_sub(popup_width)) / 2;
+    let popup_y = (area.height.saturating_sub(popup_height)) / 2;
+
+    let popup_area = Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    // Clear the area behind the popup
+    f.render_widget(ratatui::widgets::Clear, popup_area);
+
+    let fields = EditField::all();
+    let items: Vec<ListItem> = fields
+        .iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let style = if i == app.edit_field_selected {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            ListItem::new(format!("  {}", field.label())).style(style)
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(" Edit "),
+    );
+
+    f.render_widget(list, popup_area);
+}
+
 fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
     let (left_help, right_help) = match app.input_mode {
         InputMode::NewTask | InputMode::NewStream => (" Enter:create  Esc:cancel", ""),
+        InputMode::EditTaskTitle
+        | InputMode::EditTaskPriority
+        | InputMode::EditStreamName
+        | InputMode::AssignTask => (" Enter:save  Esc:cancel", ""),
         InputMode::Normal if app.search_mode => (" Type to search  Enter/Esc:close", ""),
         InputMode::Normal => match app.view {
             View::Tasks => (
-                " n:new  c:complete  r:reopen  v:view  o:sort",
+                " n:new  e:edit  a:claim  c:complete  r:reopen",
                 "::commands  ?:shortcuts",
             ),
-            View::Streams => (" n:new  d:delete  Enter:select", "::commands  ?:shortcuts"),
+            View::Streams => (
+                " n:new  e:edit  d:delete  Enter:select",
+                "::commands  ?:shortcuts",
+            ),
             View::History => {
                 if app.history_show_detail {
                     (" j/k:scroll  Esc:close", "::commands  ?:shortcuts")
