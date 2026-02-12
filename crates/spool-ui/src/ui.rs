@@ -187,20 +187,24 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
             let mut spans = vec![
                 Span::styled(status_marker, Style::default().fg(Color::Green)),
                 Span::styled(format!("{:4} ", priority), pstyle),
+                Span::raw(&task.title),
             ];
 
-            // Add stream column if showing
+            // Add stream column after title if showing
             if show_stream_col {
-                let stream_label = task
+                if let Some(stream_name) = task
                     .stream
                     .as_ref()
                     .and_then(|id| app.get_stream(id))
-                    .map(|s| format!("{:12} ", truncate_str(&s.name, 11)))
-                    .unwrap_or_else(|| "             ".to_string()); // 13 chars to match
-                spans.push(Span::styled(stream_label, Style::default().fg(Color::Blue)));
+                    .map(|s| s.name.as_str())
+                {
+                    spans.push(Span::styled(
+                        format!("  {}", truncate_str(stream_name, 14)),
+                        Style::default().fg(Color::Blue),
+                    ));
+                }
             }
 
-            spans.push(Span::raw(&task.title));
             spans.push(Span::styled(assignee, Style::default().fg(Color::DarkGray)));
 
             let line = Line::from(spans);
