@@ -11,20 +11,33 @@ Tasks are stored as append-only event logs in `.spool/events/`. Every change is 
 
 ## TUI
 
-Run `spool-ui` for a terminal interface:
+Run `spool-ui` for a terminal interface. Press `?` for all shortcuts.
 
-| Key | Action |
-|-----|--------|
-| `j/k` | Navigate / scroll detail |
-| `c` | Complete task |
-| `r` | Reopen task |
-| `n` | New task |
-| `v` | Cycle view (Open/Complete/All) |
-| `o` | Cycle sort |
-| `s` | Streams view |
-| `/` | Search |
-| `h` | History view |
-| `q` | Quit |
+**Navigation**
+- `j/k` or `↑/↓` — Move up/down
+- `g/G` — Jump to first/last
+- `[/]` or `Option+←/→` — Switch view
+- `Tab` — Toggle detail panel
+- `Enter` — Show detail / select
+
+**Tasks**
+- `n` — New task
+- `c` — Complete task
+- `r` — Reopen task
+- `v` — Cycle status (Open/Complete/All)
+- `o` — Cycle sort order
+- `/` — Search
+
+**Streams**
+- `s` — Streams view
+- `n` — New stream (in streams view)
+- `d` — Delete stream (in streams view)
+
+**General**
+- `h` — History view
+- `?` — Show shortcuts
+- `q` — Quit
+- `Esc` — Back / quit
 
 ## Usage
 
