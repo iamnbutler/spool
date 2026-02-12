@@ -1032,13 +1032,13 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         InputMode::NewTask | InputMode::NewStream => (" Enter:create  Esc:cancel", ""),
         InputMode::Normal if app.search_mode => (" Type to search  Enter/Esc:close", ""),
         InputMode::Normal => match app.view {
-            View::Tasks => (" n:new  c:complete  r:reopen  v:view  o:sort", "?:help "),
-            View::Streams => (" n:new  d:delete  Enter:select", "?:help "),
+            View::Tasks => (" n:new  c:complete  r:reopen  v:view  o:sort", "?:shortcuts"),
+            View::Streams => (" n:new  d:delete  Enter:select", "?:shortcuts"),
             View::History => {
                 if app.history_show_detail {
-                    (" j/k:scroll  Esc:close", "?:help ")
+                    (" j/k:scroll  Esc:close", "?:shortcuts")
                 } else {
-                    (" j/k:nav  Enter:detail", "?:help ")
+                    (" j/k:nav  Enter:detail", "?:shortcuts")
                 }
             }
         },
