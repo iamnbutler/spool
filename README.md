@@ -20,9 +20,10 @@ Run `spool-ui` for a terminal interface:
 | `r` | Reopen task |
 | `n` | New task |
 | `v` | Cycle view (Open/Complete/All) |
-| `s` | Cycle sort |
-| `S` | Cycle stream |
+| `o` | Cycle sort |
+| `s` | Streams view |
 | `/` | Search |
+| `h` | History view |
 | `q` | Quit |
 
 ## Usage

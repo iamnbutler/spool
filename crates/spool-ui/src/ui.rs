@@ -94,6 +94,9 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
                 search_indicator,
             )
         }
+        View::Streams => {
+            format!(" spool  Streams  {} streams", app.stream_ids.len())
+        }
         View::History => {
             format!(" spool  History  {} events", app.history_events.len())
         }
@@ -121,6 +124,9 @@ fn draw_main(f: &mut Frame, area: Rect, app: &mut App) {
             } else {
                 draw_task_list(f, area, app);
             }
+        }
+        View::Streams => {
+            draw_streams(f, area, app);
         }
         View::History => {
             draw_history(f, area, app);
@@ -344,6 +350,61 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
     // Set after content is consumed
     app.detail_content_height = content_height;
     app.detail_visible_height = visible_height;
+}
+
+fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
+    let items: Vec<ListItem> = app
+        .stream_ids
+        .iter()
+        .enumerate()
+        .map(|(i, stream_id)| {
+            let stream = app.streams.get(stream_id);
+            let name = stream.map(|s| s.name.as_str()).unwrap_or(stream_id);
+            let desc = stream
+                .and_then(|s| s.description.as_deref())
+                .unwrap_or("");
+
+            // Count tasks in this stream
+            let task_count = app
+                .all_tasks
+                .values()
+                .filter(|t| t.stream.as_ref() == Some(stream_id))
+                .count();
+
+            let line = Line::from(vec![
+                Span::styled(
+                    format!("{:20} ", truncate_str(name, 19)),
+                    Style::default()
+                        .fg(Color::Blue)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("{:4} tasks  ", task_count),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::styled(truncate_str(desc, 40), Style::default().fg(Color::White)),
+            ]);
+
+            let style = if i == app.streams_selected {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+
+            ListItem::new(line).style(style)
+        })
+        .collect();
+
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan))
+            .title(format!(" Streams ({}) ", app.stream_ids.len())),
+    );
+
+    f.render_widget(list, area);
 }
 
 fn draw_history(f: &mut Frame, area: Rect, app: &App) {
@@ -766,8 +827,9 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         InputMode::Normal if app.search_mode => " Type to search, Enter/Esc to close ",
         InputMode::Normal => match app.view {
             View::Tasks => {
-                " q:quit  j/k:nav  c:complete  r:reopen  n:new  v:view  s:sort  /:search  h:history "
+                " q:quit  j/k:nav  c:complete  r:reopen  n:new  v:view  o:sort  s:streams  /:search  h:history "
             }
+            View::Streams => " q:quit  j/k:nav  Enter:select  Esc/s:back ",
             View::History => {
                 if app.history_show_detail {
                     " q:quit  j/k:scroll  Tab/Shift-Tab:nav  Esc:close  h:back "

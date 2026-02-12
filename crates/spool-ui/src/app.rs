@@ -7,6 +7,7 @@ use spool::writer::{self, CreateTaskParams};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Tasks,
+    Streams,
     History,
 }
 
@@ -94,6 +95,9 @@ pub struct App {
     pub task_events: Vec<Event>,
     // View state
     pub view: View,
+    // Streams view state
+    pub streams_selected: usize,
+    // History view state
     pub history_events: Vec<Event>,
     pub history_selected: usize,
     pub history_scroll_x: u16,
@@ -150,6 +154,7 @@ impl App {
             search_mode: false,
             task_events: Vec::new(),
             view: View::Tasks,
+            streams_selected: 0,
             history_events: Vec::new(),
             history_selected: 0,
             history_scroll_x: 0,
@@ -347,26 +352,6 @@ impl App {
         let _ = self.reload_tasks();
     }
 
-    pub fn cycle_stream_filter(&mut self) {
-        if self.stream_ids.is_empty() {
-            return;
-        }
-
-        self.stream_filter = match &self.stream_filter {
-            None => Some(self.stream_ids[0].clone()),
-            Some(current) => {
-                let idx = self.stream_ids.iter().position(|id| id == current);
-                match idx {
-                    Some(i) if i + 1 < self.stream_ids.len() => {
-                        Some(self.stream_ids[i + 1].clone())
-                    }
-                    _ => None, // wrap back to "All"
-                }
-            }
-        };
-        let _ = self.reload_tasks();
-    }
-
     pub fn stream_filter_label(&self) -> String {
         match &self.stream_filter {
             None => "All".to_string(),
@@ -477,11 +462,53 @@ impl App {
         self.message = None;
     }
 
+    // Streams view methods
+
+    pub fn toggle_streams_view(&mut self) {
+        match self.view {
+            View::Streams => {
+                self.view = View::Tasks;
+            }
+            _ => {
+                self.view = View::Streams;
+                self.streams_selected = 0;
+            }
+        }
+    }
+
+    pub fn streams_next(&mut self) {
+        if !self.stream_ids.is_empty() {
+            self.streams_selected = (self.streams_selected + 1).min(self.stream_ids.len() - 1);
+        }
+    }
+
+    pub fn streams_previous(&mut self) {
+        self.streams_selected = self.streams_selected.saturating_sub(1);
+    }
+
+    pub fn streams_first(&mut self) {
+        self.streams_selected = 0;
+    }
+
+    pub fn streams_last(&mut self) {
+        if !self.stream_ids.is_empty() {
+            self.streams_selected = self.stream_ids.len() - 1;
+        }
+    }
+
+    pub fn select_current_stream(&mut self) {
+        if let Some(stream_id) = self.stream_ids.get(self.streams_selected) {
+            self.stream_filter = Some(stream_id.clone());
+            self.view = View::Tasks;
+            let _ = self.reload_tasks();
+        }
+    }
+
     // History view methods
 
     pub fn toggle_history_view(&mut self) {
         match self.view {
-            View::Tasks => {
+            View::Tasks | View::Streams => {
                 self.view = View::History;
                 let _ = self.load_history();
             }

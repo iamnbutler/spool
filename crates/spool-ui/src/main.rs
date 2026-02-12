@@ -114,6 +114,16 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         }
                         _ => {}
                     },
+                    InputMode::Normal if app.view == View::Streams => match key.code {
+                        KeyCode::Char('q') => return Ok(()),
+                        KeyCode::Char('j') | KeyCode::Down => app.streams_next(),
+                        KeyCode::Char('k') | KeyCode::Up => app.streams_previous(),
+                        KeyCode::Char('g') => app.streams_first(),
+                        KeyCode::Char('G') => app.streams_last(),
+                        KeyCode::Enter => app.select_current_stream(),
+                        KeyCode::Esc | KeyCode::Char('s') => app.toggle_streams_view(),
+                        _ => {}
+                    },
                     InputMode::Normal => match key.code {
                         KeyCode::Char('q') => return Ok(()),
                         KeyCode::Char('j') | KeyCode::Down => {
@@ -135,8 +145,8 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                         KeyCode::Tab => app.toggle_focus(),
                         KeyCode::Enter => app.toggle_detail(),
                         KeyCode::Char('v') => app.cycle_status_filter(),
-                        KeyCode::Char('s') => app.cycle_sort(),
-                        KeyCode::Char('S') => app.cycle_stream_filter(),
+                        KeyCode::Char('o') => app.cycle_sort(),
+                        KeyCode::Char('s') => app.toggle_streams_view(),
                         KeyCode::Char('/') => app.toggle_search(),
                         KeyCode::Esc => {
                             if app.search_query.is_empty() {
