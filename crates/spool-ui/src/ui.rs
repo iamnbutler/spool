@@ -71,7 +71,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_header(f: &mut Frame, area: Rect, app: &App) {
-    let title = match app.view {
+    // Build left side content
+    let left_content = match app.view {
         View::Tasks => {
             let search_indicator = if !app.search_query.is_empty() {
                 format!("  \"{}\"", app.search_query)
@@ -95,18 +96,53 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
             )
         }
         View::Streams => {
-            format!(" spool  Streams  {} streams", app.stream_ids.len())
+            format!(" spool  {} streams", app.stream_ids.len())
         }
         View::History => {
-            format!(" spool  History  {} events", app.history_events.len())
+            format!(" spool  {} events", app.history_events.len())
         }
     };
 
-    let header = Paragraph::new(title).style(
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-    );
+    // Build nav tabs for right side
+    let nav_style_active = Style::default()
+        .fg(Color::Cyan)
+        .add_modifier(Modifier::BOLD);
+    let nav_style_inactive = Style::default().fg(Color::DarkGray);
+
+    let tasks_style = if app.view == View::Tasks {
+        nav_style_active
+    } else {
+        nav_style_inactive
+    };
+    let streams_style = if app.view == View::Streams {
+        nav_style_active
+    } else {
+        nav_style_inactive
+    };
+    let history_style = if app.view == View::History {
+        nav_style_active
+    } else {
+        nav_style_inactive
+    };
+
+    // Calculate padding to right-align nav
+    let nav_text = "tasks  streams  history ";
+    let left_len = left_content.chars().count();
+    let nav_len = nav_text.chars().count();
+    let total_width = area.width as usize;
+    let padding = total_width.saturating_sub(left_len + nav_len);
+
+    let line = Line::from(vec![
+        Span::styled(left_content, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::raw(" ".repeat(padding)),
+        Span::styled("tasks", tasks_style),
+        Span::styled("  ", nav_style_inactive),
+        Span::styled("streams", streams_style),
+        Span::styled("  ", nav_style_inactive),
+        Span::styled("history ", history_style),
+    ]);
+
+    let header = Paragraph::new(line);
     f.render_widget(header, area);
 }
 
