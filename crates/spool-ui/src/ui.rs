@@ -138,6 +138,33 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
     // Only show stream column when not filtering by a specific stream
     let show_stream_col = app.stream_filter.is_none();
 
+    let border_style = if app.focus == Focus::TaskList {
+        Style::default().fg(Color::Cyan)
+    } else {
+        Style::default().fg(Color::DarkGray)
+    };
+
+    let title = if app.search_mode {
+        format!(" Tasks  /{}▌", app.search_query)
+    } else {
+        " Tasks ".to_string()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(border_style)
+        .title(title);
+
+    // Handle empty state
+    if app.tasks.is_empty() {
+        let empty_message = build_empty_tasks_message(app);
+        let paragraph = Paragraph::new(empty_message)
+            .block(block)
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(paragraph, area);
+        return;
+    }
+
     let items: Vec<ListItem> = app
         .tasks
         .iter()
@@ -190,26 +217,75 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
         })
         .collect();
 
-    let border_style = if app.focus == Focus::TaskList {
-        Style::default().fg(Color::Cyan)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-
-    let title = if app.search_mode {
-        format!(" Tasks  /{}▌", app.search_query)
-    } else {
-        " Tasks ".to_string()
-    };
-
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(border_style)
-            .title(title),
-    );
-
+    let list = List::new(items).block(block);
     f.render_widget(list, area);
+}
+
+fn build_empty_tasks_message(app: &App) -> Line<'static> {
+    use crate::app::StatusFilter;
+
+    // Count tasks by status
+    let open_count = app
+        .all_tasks
+        .values()
+        .filter(|t| t.status == spool::state::TaskStatus::Open)
+        .count();
+    let complete_count = app
+        .all_tasks
+        .values()
+        .filter(|t| t.status == spool::state::TaskStatus::Complete)
+        .count();
+    let total = app.all_tasks.len();
+
+    // Build contextual message
+    let (status_text, other_count, hint) = match app.status_filter {
+        StatusFilter::Open => ("open", complete_count, "v to toggle"),
+        StatusFilter::Complete => ("completed", open_count, "v to toggle"),
+        StatusFilter::All => ("", 0, "n to create"),
+    };
+
+    if total == 0 {
+        return Line::from(" No tasks yet - n to create");
+    }
+
+    if !app.search_query.is_empty() {
+        return Line::from(format!(
+            " No matches for \"{}\" - Esc to clear",
+            app.search_query
+        ));
+    }
+
+    if app.stream_filter.is_some() {
+        let stream_name = app.stream_filter_label();
+        return Line::from(format!(
+            " No {} tasks in {} ({} {}) - {}",
+            status_text,
+            stream_name,
+            other_count,
+            if app.status_filter == StatusFilter::Open {
+                "completed"
+            } else {
+                "open"
+            },
+            hint
+        ));
+    }
+
+    if app.status_filter == StatusFilter::All {
+        Line::from(" No tasks yet - n to create")
+    } else {
+        Line::from(format!(
+            " No {} tasks ({} {}) - {}",
+            status_text,
+            other_count,
+            if app.status_filter == StatusFilter::Open {
+                "completed"
+            } else {
+                "open"
+            },
+            hint
+        ))
+    }
 }
 
 fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
@@ -353,6 +429,21 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan))
+        .title(format!(" Streams ({}) ", app.stream_ids.len()));
+
+    // Handle empty state
+    if app.stream_ids.is_empty() {
+        let message = Line::from(" No streams yet - use CLI: spool stream add <name>");
+        let paragraph = Paragraph::new(message)
+            .block(block)
+            .style(Style::default().fg(Color::DarkGray));
+        f.render_widget(paragraph, area);
+        return;
+    }
+
     let items: Vec<ListItem> = app
         .stream_ids
         .iter()
@@ -397,13 +488,7 @@ fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
         })
         .collect();
 
-    let list = List::new(items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan))
-            .title(format!(" Streams ({}) ", app.stream_ids.len())),
-    );
-
+    let list = List::new(items).block(block);
     f.render_widget(list, area);
 }
 
