@@ -237,6 +237,11 @@ impl App {
         })
     }
 
+    /// Returns the path to the events directory for file watching
+    pub fn events_dir(&self) -> &std::path::Path {
+        &self.ctx.events_dir
+    }
+
     pub fn reload_tasks(&mut self) -> Result<()> {
         let state = load_or_materialize_state(&self.ctx)?;
         self.streams = state.streams.clone();
