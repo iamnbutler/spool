@@ -1,4 +1,5 @@
 use anyhow::Result;
+use ratatui::widgets::ListState;
 use spool::context::SpoolContext;
 use spool::event::Event;
 use spool::state::{load_or_materialize_state, Stream, Task, TaskStatus};
@@ -141,6 +142,7 @@ pub struct App {
     pub stream_ids: Vec<String>, // sorted list of stream IDs for cycling
     pub stream_filter: Option<String>, // None = all streams
     pub selected: usize,
+    pub task_list_state: ListState,
     pub focus: Focus,
     pub show_detail: bool,
     pub status_filter: StatusFilter,
@@ -152,9 +154,11 @@ pub struct App {
     pub view: View,
     // Streams view state
     pub streams_selected: usize,
+    pub streams_list_state: ListState,
     // History view state
     pub history_events: Vec<Event>,
     pub history_selected: usize,
+    pub history_list_state: ListState,
     pub history_scroll_x: u16,
     pub history_show_detail: bool,
     pub history_detail_scroll: u16,
@@ -218,6 +222,7 @@ impl App {
             stream_ids,
             stream_filter: None,
             selected: 0,
+            task_list_state: ListState::default().with_selected(Some(0)),
             focus: Focus::TaskList,
             show_detail: false,
             status_filter: StatusFilter::Open,
@@ -227,8 +232,10 @@ impl App {
             task_events: Vec::new(),
             view: View::Tasks,
             streams_selected: 0,
+            streams_list_state: ListState::default().with_selected(Some(0)),
             history_events: Vec::new(),
             history_selected: 0,
+            history_list_state: ListState::default().with_selected(Some(0)),
             history_scroll_x: 0,
             history_show_detail: false,
             history_detail_scroll: 0,
@@ -299,6 +306,16 @@ impl App {
         if self.tasks.is_empty() {
             self.selected = 0;
         }
+        self.task_list_state.select(Some(self.selected));
+
+        // Also sync streams list state
+        if self.streams_selected >= self.stream_ids.len() && !self.stream_ids.is_empty() {
+            self.streams_selected = self.stream_ids.len() - 1;
+        }
+        if self.stream_ids.is_empty() {
+            self.streams_selected = 0;
+        }
+        self.streams_list_state.select(Some(self.streams_selected));
 
         Ok(())
     }
@@ -345,6 +362,7 @@ impl App {
     pub fn next_task(&mut self) {
         if !self.tasks.is_empty() {
             self.selected = (self.selected + 1).min(self.tasks.len() - 1);
+            self.task_list_state.select(Some(self.selected));
             self.detail_scroll = 0;
             if self.show_detail {
                 let _ = self.load_task_events();
@@ -354,6 +372,7 @@ impl App {
 
     pub fn previous_task(&mut self) {
         self.selected = self.selected.saturating_sub(1);
+        self.task_list_state.select(Some(self.selected));
         self.detail_scroll = 0;
         if self.show_detail {
             let _ = self.load_task_events();
@@ -375,11 +394,13 @@ impl App {
 
     pub fn first_task(&mut self) {
         self.selected = 0;
+        self.task_list_state.select(Some(0));
     }
 
     pub fn last_task(&mut self) {
         if !self.tasks.is_empty() {
             self.selected = self.tasks.len() - 1;
+            self.task_list_state.select(Some(self.selected));
         }
     }
 
@@ -848,20 +869,24 @@ impl App {
     pub fn streams_next(&mut self) {
         if !self.stream_ids.is_empty() {
             self.streams_selected = (self.streams_selected + 1).min(self.stream_ids.len() - 1);
+            self.streams_list_state.select(Some(self.streams_selected));
         }
     }
 
     pub fn streams_previous(&mut self) {
         self.streams_selected = self.streams_selected.saturating_sub(1);
+        self.streams_list_state.select(Some(self.streams_selected));
     }
 
     pub fn streams_first(&mut self) {
         self.streams_selected = 0;
+        self.streams_list_state.select(Some(0));
     }
 
     pub fn streams_last(&mut self) {
         if !self.stream_ids.is_empty() {
             self.streams_selected = self.stream_ids.len() - 1;
+            self.streams_list_state.select(Some(self.streams_selected));
         }
     }
 
@@ -1025,26 +1050,31 @@ impl App {
         all_events.sort_by(|a, b| b.ts.cmp(&a.ts));
         self.history_events = all_events;
         self.history_selected = 0;
+        self.history_list_state.select(Some(0));
         Ok(())
     }
 
     pub fn history_next(&mut self) {
         if !self.history_events.is_empty() {
             self.history_selected = (self.history_selected + 1).min(self.history_events.len() - 1);
+            self.history_list_state.select(Some(self.history_selected));
         }
     }
 
     pub fn history_previous(&mut self) {
         self.history_selected = self.history_selected.saturating_sub(1);
+        self.history_list_state.select(Some(self.history_selected));
     }
 
     pub fn history_first(&mut self) {
         self.history_selected = 0;
+        self.history_list_state.select(Some(0));
     }
 
     pub fn history_last(&mut self) {
         if !self.history_events.is_empty() {
             self.history_selected = self.history_events.len() - 1;
+            self.history_list_state.select(Some(self.history_selected));
         }
     }
 

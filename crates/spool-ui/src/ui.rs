@@ -217,8 +217,7 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
     let items: Vec<ListItem> = app
         .tasks
         .iter()
-        .enumerate()
-        .map(|(i, task)| {
+        .map(|task| {
             let priority = task.priority.as_deref().unwrap_or("--");
             let pstyle = priority_style(priority);
 
@@ -258,20 +257,16 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
 
             let line = Line::from(spans);
 
-            let style = if i == app.selected {
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-
-            ListItem::new(line).style(style)
+            ListItem::new(line)
         })
         .collect();
 
-    let list = List::new(items).block(block);
-    f.render_widget(list, area);
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    );
+    f.render_stateful_widget(list, area, &mut app.task_list_state);
 }
 
 fn build_empty_tasks_message(app: &App) -> Line<'static> {
@@ -481,7 +476,7 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
     app.detail_visible_height = visible_height;
 }
 
-fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
+fn draw_streams(f: &mut Frame, area: Rect, app: &mut App) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan))
@@ -500,8 +495,7 @@ fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
     let items: Vec<ListItem> = app
         .stream_ids
         .iter()
-        .enumerate()
-        .map(|(i, stream_id)| {
+        .map(|stream_id| {
             let stream = app.streams.get(stream_id);
             let name = stream.map(|s| s.name.as_str()).unwrap_or(stream_id);
             let desc = stream.and_then(|s| s.description.as_deref()).unwrap_or("");
@@ -527,23 +521,19 @@ fn draw_streams(f: &mut Frame, area: Rect, app: &App) {
                 Span::styled(truncate_str(desc, 40), Style::default().fg(Color::White)),
             ]);
 
-            let style = if i == app.streams_selected {
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-
-            ListItem::new(line).style(style)
+            ListItem::new(line)
         })
         .collect();
 
-    let list = List::new(items).block(block);
-    f.render_widget(list, area);
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    );
+    f.render_stateful_widget(list, area, &mut app.streams_list_state);
 }
 
-fn draw_history(f: &mut Frame, area: Rect, app: &App) {
+fn draw_history(f: &mut Frame, area: Rect, app: &mut App) {
     if app.history_show_detail {
         // Split layout: list on left, detail on right
         let chunks = Layout::default()
@@ -568,7 +558,7 @@ const HISTORY_COLS: &[(&str, usize)] = &[
     ("ID", 24),
 ];
 
-fn draw_history_list(f: &mut Frame, area: Rect, app: &App) {
+fn draw_history_list(f: &mut Frame, area: Rect, app: &mut App) {
     let scroll_x = app.history_scroll_x as usize;
 
     // Build header row
@@ -585,8 +575,7 @@ fn draw_history_list(f: &mut Frame, area: Rect, app: &App) {
     let items: Vec<ListItem> = app
         .history_events
         .iter()
-        .enumerate()
-        .map(|(i, event)| {
+        .map(|event| {
             let op_str = event.op.to_string();
             let op_color = operation_color(&op_str);
 
@@ -634,15 +623,7 @@ fn draw_history_list(f: &mut Frame, area: Rect, app: &App) {
 
             let line = Line::from(spans);
 
-            let style = if i == app.history_selected {
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default()
-            };
-
-            ListItem::new(line).style(style)
+            ListItem::new(line)
         })
         .collect();
 
@@ -686,8 +667,12 @@ fn draw_history_list(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(header, chunks[0]);
 
     // Render list
-    let list = List::new(items);
-    f.render_widget(list, chunks[1]);
+    let list = List::new(items).highlight_style(
+        Style::default()
+            .bg(Color::DarkGray)
+            .add_modifier(Modifier::BOLD),
+    );
+    f.render_stateful_widget(list, chunks[1], &mut app.history_list_state);
 }
 
 // Lines are built conditionally based on event type (task vs stream) and optional fields,
