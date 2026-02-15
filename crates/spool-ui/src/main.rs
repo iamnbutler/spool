@@ -2,6 +2,8 @@ mod app;
 mod ui;
 
 use std::io;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use anyhow::Result;
 use crossterm::{
@@ -11,6 +13,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use notify::{RecursiveMode, Watcher};
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use app::{App, InputMode, View};
@@ -44,246 +47,275 @@ fn main() -> Result<()> {
 }
 
 fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
+    // Set up file watcher for live reload
+    let (watcher_tx, watcher_rx) = mpsc::channel();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            // Only trigger on modifications and creates (not removes or access)
+            if event.kind.is_modify() || event.kind.is_create() {
+                let _ = watcher_tx.send(());
+            }
+        }
+    })?;
+
+    // Watch the events directory
+    watcher.watch(app.events_dir(), RecursiveMode::NonRecursive)?;
+
+    // Poll timeout - balance between responsiveness and CPU usage
+    let poll_timeout = Duration::from_millis(100);
+
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                // Ctrl+C quits from any mode
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                    return Ok(());
-                }
+        // Check for file changes (non-blocking)
+        if watcher_rx.try_recv().is_ok() {
+            // Drain any additional pending events to avoid multiple reloads
+            while watcher_rx.try_recv().is_ok() {}
+            let _ = app.reload_tasks();
+        }
 
-                // Global view navigation (Option+Arrow or [/])
-                // Skip if in input mode
-                if app.input_mode == InputMode::Normal && !app.search_mode {
-                    let is_alt = key.modifiers.contains(KeyModifiers::ALT);
-                    match key.code {
-                        KeyCode::Right if is_alt => {
-                            app.next_view();
-                            continue;
-                        }
-                        KeyCode::Left if is_alt => {
-                            app.previous_view();
-                            continue;
-                        }
-                        KeyCode::Char(']') => {
-                            app.next_view();
-                            continue;
-                        }
-                        KeyCode::Char('[') => {
-                            app.previous_view();
-                            continue;
-                        }
-                        _ => {}
+        // Poll for keyboard events with timeout
+        if event::poll(poll_timeout)? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    // Ctrl+C quits from any mode
+                    if key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('c')
+                    {
+                        return Ok(());
                     }
-                }
 
-                // Clear message on any keypress (except Esc when pending quit)
-                let is_esc = key.code == KeyCode::Esc;
-                if !(is_esc && app.pending_quit) {
-                    app.clear_message();
-                }
-
-                // Help toggle works globally
-                if key.code == KeyCode::Char('?')
-                    && app.input_mode == InputMode::Normal
-                    && !app.search_mode
-                {
-                    app.toggle_help();
-                    continue;
-                }
-
-                // Close help with any key if open
-                if app.show_help {
-                    app.show_help = false;
-                    continue;
-                }
-
-                // Command palette handling
-                if app.show_command_palette {
-                    match key.code {
-                        KeyCode::Esc => app.show_command_palette = false,
-                        KeyCode::Char('j') | KeyCode::Down => app.command_next(),
-                        KeyCode::Char('k') | KeyCode::Up => app.command_previous(),
-                        KeyCode::Enter => app.execute_selected_command(),
-                        KeyCode::Char(':') => app.show_command_palette = false,
-                        _ => {}
+                    // Global view navigation (Option+Arrow or [/])
+                    // Skip if in input mode
+                    if app.input_mode == InputMode::Normal && !app.search_mode {
+                        let is_alt = key.modifiers.contains(KeyModifiers::ALT);
+                        match key.code {
+                            KeyCode::Right if is_alt => {
+                                app.next_view();
+                                continue;
+                            }
+                            KeyCode::Left if is_alt => {
+                                app.previous_view();
+                                continue;
+                            }
+                            KeyCode::Char(']') => {
+                                app.next_view();
+                                continue;
+                            }
+                            KeyCode::Char('[') => {
+                                app.previous_view();
+                                continue;
+                            }
+                            _ => {}
+                        }
                     }
-                    continue;
-                }
 
-                // Command palette toggle (: like vim)
-                if key.code == KeyCode::Char(':')
-                    && app.input_mode == InputMode::Normal
-                    && !app.search_mode
-                {
-                    app.toggle_command_palette();
-                    continue;
-                }
-
-                // Edit menu handling
-                if app.show_edit_menu {
-                    match key.code {
-                        KeyCode::Esc => app.close_edit_menu(),
-                        KeyCode::Char('j') | KeyCode::Down => app.edit_menu_next(),
-                        KeyCode::Char('k') | KeyCode::Up => app.edit_menu_previous(),
-                        KeyCode::Enter => app.start_editing_selected_field(),
-                        KeyCode::Char('e') => app.close_edit_menu(),
-                        _ => {}
+                    // Clear message on any keypress (except Esc when pending quit)
+                    let is_esc = key.code == KeyCode::Esc;
+                    if !(is_esc && app.pending_quit) {
+                        app.clear_message();
                     }
-                    continue;
-                }
 
-                match app.input_mode {
-                    InputMode::NewTask => match key.code {
-                        KeyCode::Esc => app.cancel_input(),
-                        KeyCode::Enter => app.submit_new_task(),
-                        KeyCode::Backspace => app.input_backspace(),
-                        KeyCode::Char(c) => app.input_char(c),
-                        _ => {}
-                    },
-                    InputMode::NewStream => match key.code {
-                        KeyCode::Esc => app.cancel_input(),
-                        KeyCode::Enter => app.submit_new_stream(),
-                        KeyCode::Backspace => app.input_backspace(),
-                        KeyCode::Char(c) => app.input_char(c),
-                        _ => {}
-                    },
-                    InputMode::EditTaskTitle | InputMode::EditTaskPriority => match key.code {
-                        KeyCode::Esc => app.cancel_input(),
-                        KeyCode::Enter => app.submit_task_edit(),
-                        KeyCode::Backspace => app.input_backspace(),
-                        KeyCode::Char(c) => app.input_char(c),
-                        _ => {}
-                    },
-                    InputMode::EditStreamName => match key.code {
-                        KeyCode::Esc => app.cancel_input(),
-                        KeyCode::Enter => app.submit_stream_edit(),
-                        KeyCode::Backspace => app.input_backspace(),
-                        KeyCode::Char(c) => app.input_char(c),
-                        _ => {}
-                    },
-                    InputMode::AssignTask => match key.code {
-                        KeyCode::Esc => app.cancel_input(),
-                        KeyCode::Enter => app.submit_assign_task(),
-                        KeyCode::Backspace => app.input_backspace(),
-                        KeyCode::Char(c) => app.input_char(c),
-                        _ => {}
-                    },
-                    InputMode::Normal if app.search_mode => match key.code {
-                        KeyCode::Esc => app.toggle_search(),
-                        KeyCode::Enter => app.toggle_search(),
-                        KeyCode::Backspace => app.search_backspace(),
-                        KeyCode::Char(c) => app.search_input(c),
-                        _ => {}
-                    },
-                    InputMode::Normal if app.view == View::History => match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Char('h') => app.toggle_history_view(),
-                        KeyCode::Esc => {
-                            if app.history_show_detail {
-                                app.close_history_detail();
-                            } else if app.request_quit() {
-                                return Ok(());
-                            }
+                    // Help toggle works globally
+                    if key.code == KeyCode::Char('?')
+                        && app.input_mode == InputMode::Normal
+                        && !app.search_mode
+                    {
+                        app.toggle_help();
+                        continue;
+                    }
+
+                    // Close help with any key if open
+                    if app.show_help {
+                        app.show_help = false;
+                        continue;
+                    }
+
+                    // Command palette handling
+                    if app.show_command_palette {
+                        match key.code {
+                            KeyCode::Esc => app.show_command_palette = false,
+                            KeyCode::Char('j') | KeyCode::Down => app.command_next(),
+                            KeyCode::Char('k') | KeyCode::Up => app.command_previous(),
+                            KeyCode::Enter => app.execute_selected_command(),
+                            KeyCode::Char(':') => app.show_command_palette = false,
+                            _ => {}
                         }
-                        KeyCode::Char('j') | KeyCode::Down => {
-                            if app.history_show_detail {
-                                app.history_detail_scroll_down();
-                            } else {
-                                app.history_next();
-                            }
+                        continue;
+                    }
+
+                    // Command palette toggle (: like vim)
+                    if key.code == KeyCode::Char(':')
+                        && app.input_mode == InputMode::Normal
+                        && !app.search_mode
+                    {
+                        app.toggle_command_palette();
+                        continue;
+                    }
+
+                    // Edit menu handling
+                    if app.show_edit_menu {
+                        match key.code {
+                            KeyCode::Esc => app.close_edit_menu(),
+                            KeyCode::Char('j') | KeyCode::Down => app.edit_menu_next(),
+                            KeyCode::Char('k') | KeyCode::Up => app.edit_menu_previous(),
+                            KeyCode::Enter => app.start_editing_selected_field(),
+                            KeyCode::Char('e') => app.close_edit_menu(),
+                            _ => {}
                         }
-                        KeyCode::Char('k') | KeyCode::Up => {
-                            if app.history_show_detail {
-                                app.history_detail_scroll_up();
-                            } else {
-                                app.history_previous();
+                        continue;
+                    }
+
+                    match app.input_mode {
+                        InputMode::NewTask => match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_new_task(),
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        },
+                        InputMode::NewStream => match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_new_stream(),
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        },
+                        InputMode::EditTaskTitle | InputMode::EditTaskPriority => match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_task_edit(),
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        },
+                        InputMode::EditStreamName => match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_stream_edit(),
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        },
+                        InputMode::AssignTask => match key.code {
+                            KeyCode::Esc => app.cancel_input(),
+                            KeyCode::Enter => app.submit_assign_task(),
+                            KeyCode::Backspace => app.input_backspace(),
+                            KeyCode::Char(c) => app.input_char(c),
+                            _ => {}
+                        },
+                        InputMode::Normal if app.search_mode => match key.code {
+                            KeyCode::Esc => app.toggle_search(),
+                            KeyCode::Enter => app.toggle_search(),
+                            KeyCode::Backspace => app.search_backspace(),
+                            KeyCode::Char(c) => app.search_input(c),
+                            _ => {}
+                        },
+                        InputMode::Normal if app.view == View::History => match key.code {
+                            KeyCode::Char('q') => return Ok(()),
+                            KeyCode::Char('h') => app.toggle_history_view(),
+                            KeyCode::Esc => {
+                                if app.history_show_detail {
+                                    app.close_history_detail();
+                                } else if app.request_quit() {
+                                    return Ok(());
+                                }
                             }
-                        }
-                        KeyCode::Char('g') => app.history_first(),
-                        KeyCode::Char('G') => app.history_last(),
-                        KeyCode::Char('l') | KeyCode::Right => app.history_scroll_right(),
-                        KeyCode::Left => app.history_scroll_left(),
-                        KeyCode::Enter => app.toggle_history_detail(),
-                        KeyCode::Tab => {
-                            // Allow navigating list even when detail is open
-                            if app.history_show_detail {
-                                app.history_next();
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                if app.history_show_detail {
+                                    app.history_detail_scroll_down();
+                                } else {
+                                    app.history_next();
+                                }
                             }
-                        }
-                        KeyCode::BackTab => {
-                            if app.history_show_detail {
-                                app.history_previous();
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                if app.history_show_detail {
+                                    app.history_detail_scroll_up();
+                                } else {
+                                    app.history_previous();
+                                }
                             }
-                        }
-                        _ => {}
-                    },
-                    InputMode::Normal if app.view == View::Streams => match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Char('j') | KeyCode::Down => app.streams_next(),
-                        KeyCode::Char('k') | KeyCode::Up => app.streams_previous(),
-                        KeyCode::Char('g') => app.streams_first(),
-                        KeyCode::Char('G') => app.streams_last(),
-                        KeyCode::Enter => app.select_current_stream(),
-                        KeyCode::Char('n') => app.start_new_stream(),
-                        KeyCode::Char('e') => app.start_edit_stream(),
-                        KeyCode::Char('d') => {
-                            if app.pending_delete_stream.is_some() {
-                                app.confirm_delete_stream();
-                            } else {
-                                app.request_delete_stream();
+                            KeyCode::Char('g') => app.history_first(),
+                            KeyCode::Char('G') => app.history_last(),
+                            KeyCode::Char('l') | KeyCode::Right => app.history_scroll_right(),
+                            KeyCode::Left => app.history_scroll_left(),
+                            KeyCode::Enter => app.toggle_history_detail(),
+                            KeyCode::Tab => {
+                                // Allow navigating list even when detail is open
+                                if app.history_show_detail {
+                                    app.history_next();
+                                }
                             }
-                        }
-                        KeyCode::Esc | KeyCode::Char('s') => app.toggle_streams_view(),
-                        _ => {}
-                    },
-                    InputMode::Normal => match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Char('j') | KeyCode::Down => {
-                            if app.focus == app::Focus::Detail {
-                                app.scroll_detail_down();
-                            } else {
-                                app.next_task();
+                            KeyCode::BackTab => {
+                                if app.history_show_detail {
+                                    app.history_previous();
+                                }
                             }
-                        }
-                        KeyCode::Char('k') | KeyCode::Up => {
-                            if app.focus == app::Focus::Detail {
-                                app.scroll_detail_up();
-                            } else {
-                                app.previous_task();
+                            _ => {}
+                        },
+                        InputMode::Normal if app.view == View::Streams => match key.code {
+                            KeyCode::Char('q') => return Ok(()),
+                            KeyCode::Char('j') | KeyCode::Down => app.streams_next(),
+                            KeyCode::Char('k') | KeyCode::Up => app.streams_previous(),
+                            KeyCode::Char('g') => app.streams_first(),
+                            KeyCode::Char('G') => app.streams_last(),
+                            KeyCode::Enter => app.select_current_stream(),
+                            KeyCode::Char('n') => app.start_new_stream(),
+                            KeyCode::Char('e') => app.start_edit_stream(),
+                            KeyCode::Char('d') => {
+                                if app.pending_delete_stream.is_some() {
+                                    app.confirm_delete_stream();
+                                } else {
+                                    app.request_delete_stream();
+                                }
                             }
-                        }
-                        KeyCode::Char('g') => app.first_task(),
-                        KeyCode::Char('G') => app.last_task(),
-                        KeyCode::Tab => app.toggle_focus(),
-                        KeyCode::Enter => app.toggle_detail(),
-                        KeyCode::Char('v') => app.cycle_status_filter(),
-                        KeyCode::Char('o') => app.cycle_sort(),
-                        KeyCode::Char('s') => app.toggle_streams_view(),
-                        KeyCode::Char('/') => app.toggle_search(),
-                        KeyCode::Esc => {
-                            if !app.search_query.is_empty() {
-                                app.clear_search();
-                            } else if app.stream_filter.is_some() {
-                                app.stream_filter = None;
-                                let _ = app.reload_tasks();
-                            } else if app.request_quit() {
-                                return Ok(());
+                            KeyCode::Esc | KeyCode::Char('s') => app.toggle_streams_view(),
+                            _ => {}
+                        },
+                        InputMode::Normal => match key.code {
+                            KeyCode::Char('q') => return Ok(()),
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                if app.focus == app::Focus::Detail {
+                                    app.scroll_detail_down();
+                                } else {
+                                    app.next_task();
+                                }
                             }
-                        }
-                        // Task editing
-                        KeyCode::Char('c') => app.complete_selected_task(),
-                        KeyCode::Char('r') => app.reopen_selected_task(),
-                        KeyCode::Char('n') => app.start_new_task(),
-                        KeyCode::Char('e') => app.show_task_edit_menu(),
-                        KeyCode::Char('a') => app.claim_selected_task(),
-                        KeyCode::Char('A') => app.start_assign_task(),
-                        KeyCode::Char('u') => app.free_selected_task(),
-                        KeyCode::Char('h') => app.toggle_history_view(),
-                        _ => {}
-                    },
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                if app.focus == app::Focus::Detail {
+                                    app.scroll_detail_up();
+                                } else {
+                                    app.previous_task();
+                                }
+                            }
+                            KeyCode::Char('g') => app.first_task(),
+                            KeyCode::Char('G') => app.last_task(),
+                            KeyCode::Tab => app.toggle_focus(),
+                            KeyCode::Enter => app.toggle_detail(),
+                            KeyCode::Char('v') => app.cycle_status_filter(),
+                            KeyCode::Char('o') => app.cycle_sort(),
+                            KeyCode::Char('s') => app.toggle_streams_view(),
+                            KeyCode::Char('/') => app.toggle_search(),
+                            KeyCode::Esc => {
+                                if !app.search_query.is_empty() {
+                                    app.clear_search();
+                                } else if app.stream_filter.is_some() {
+                                    app.stream_filter = None;
+                                    let _ = app.reload_tasks();
+                                } else if app.request_quit() {
+                                    return Ok(());
+                                }
+                            }
+                            // Task editing
+                            KeyCode::Char('c') => app.complete_selected_task(),
+                            KeyCode::Char('r') => app.reopen_selected_task(),
+                            KeyCode::Char('n') => app.start_new_task(),
+                            KeyCode::Char('e') => app.show_task_edit_menu(),
+                            KeyCode::Char('a') => app.claim_selected_task(),
+                            KeyCode::Char('A') => app.start_assign_task(),
+                            KeyCode::Char('u') => app.free_selected_task(),
+                            KeyCode::Char('h') => app.toggle_history_view(),
+                            _ => {}
+                        },
+                    }
                 }
             }
         }
