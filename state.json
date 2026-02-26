@@ -1,7 +1,7 @@
 {
   "last_updated": "2026-02-26",
   "last_run": "2026-02-26",
-  "workflow_run_id": "22452734719",
+  "workflow_run_id": "22453059367",
   "monthly_activity_issue": {
     "month": "2026-02",
     "number": 40,
@@ -61,16 +61,25 @@
       "is_repo_assist": true,
       "closes": 39,
       "status": "draft",
-      "ci": "pending (0 checks as of run 22452734719)"
+      "ci": "not running (GitHub Actions cannot trigger CI on its own PRs - infrastructure limitation)"
     },
     "42": {
       "title": "[Repo Assist] chore: update dependencies (cargo update 2026-02-26)",
-      "branch": "repo-assist/deps-update-2026-02-26",
+      "branch": "repo-assist/deps-update-2026-02-26-d748501d218c660f",
       "created": "2026-02-26",
       "run": "22452428783",
       "is_repo_assist": true,
       "status": "draft",
-      "ci": "pending (0 checks as of run 22452734719)"
+      "ci": "not running (GitHub Actions cannot trigger CI on its own PRs - infrastructure limitation)"
+    },
+    "43_tbd": {
+      "title": "[Repo Assist] test(spool-ui): add unit tests for App state machine enums",
+      "branch": "repo-assist/improve-spool-ui-tests",
+      "created": "2026-02-26",
+      "run": "22453059367",
+      "is_repo_assist": true,
+      "status": "draft",
+      "note": "PR number TBD - created this run. 10 tests for pure enum logic (StatusFilter, SortBy, EditField, Command), zero new deps, 177 total tests pass."
     }
   },
   "fix_attempts": {
@@ -79,18 +88,19 @@
       "run": "22452066366",
       "status": "pr_created",
       "pr_number": 41,
-      "note": "Draft PR #41 created. Branch: repo-assist/fix-issue-39-file-name-unwrap-b9eb8a1ad530e157. All 138 tests pass. Closes #39. Issue #39 commented on with link to PR."
+      "note": "Draft PR #41 created. All 138 tests pass. Closes #39."
     }
   },
   "improvement_ideas_submitted": [
     "PR review comment on #33: scroll regression observation (2026-02-26)",
     "Bug issue #39: file_name().unwrap() potential panic in state.rs:381 and validation.rs:24,36 (2026-02-26)",
     "Fix PR for #39: replace unwrap() with ok_or_else() in state.rs and validation.rs (2026-02-26)",
-    "Deps update: cargo update (2026-02-26) - draft PR #42 created, 167 tests pass"
+    "Deps update: cargo update (2026-02-26) - draft PR #42 created, 167 tests pass",
+    "spool-ui test coverage: 10 unit tests for StatusFilter/SortBy/EditField/Command pure enum logic - draft PR created branch repo-assist/improve-spool-ui-tests (2026-02-26)"
   ],
   "backlog_cursor": {
     "issues": 40,
-    "prs": 42
+    "prs": 43
   },
   "closed_issues": {
     "38": {
@@ -101,10 +111,11 @@
     }
   },
   "task_10_in_progress": {
-    "idea": "Investigate test coverage for spool-ui crate (app.rs 1122 lines, ui.rs 1184 lines, no dedicated test infra)",
-    "status": "identified - not started",
-    "notes": "spool-ui has 2629 lines with no test dependencies listed. Could add unit tests for app state/key-handling logic separate from rendering. TUI tests are complex - evaluate feasibility first by reading app.rs.",
-    "started": "2026-02-26"
+    "idea": "spool-ui test coverage",
+    "status": "initial PR created - enum tests done, navigation tests next",
+    "notes": "Draft PR created with 10 tests for pure enum logic (no new deps). Next expansion: navigation state tests (next_task, prev_task, toggle_focus, toggle_detail, history_next etc.) which need App construction. App::new() calls SpoolContext::discover() which finds .spool in cwd. SpoolContext::new(path) is public - can construct directly with a temp dir. Could add a #[cfg(test)] pub fn new_with_context(ctx, tasks, streams) helper to App to enable isolated tests.",
+    "started": "2026-02-26",
+    "pr_branch": "repo-assist/improve-spool-ui-tests"
   },
-  "notes": "PR #42 confirmed as deps update PR (was TBD). Codebase scan clean: no remaining unwrap/expect in prod code beyond issue #39 (PR #41 fixes those), no TODO/FIXME. PR #33 has dirty merge conflict (human PR - not Repo Assist's problem to fix). Both Repo Assist PRs (#41, #42) have pending CI (0 checks - may not have run yet). Task 8 (release): wait for PRs to merge. Task 10: spool-ui test coverage gap identified for next run. Next run: check CI on #41/#42, pursue spool-ui test improvement, consider release prep if PRs merge."
+  "notes": "CI does not run on Repo Assist PRs - GitHub Actions cannot trigger CI workflows on PRs it creates (known infrastructure limitation). PR #33 has dirty merge conflict (human PR). All 3 Repo Assist PRs (#41 fix, #42 deps, new tests PR) are open drafts awaiting maintainer review. Task 8 (release): wait for PRs to merge. Next run: confirm PR number for tests PR, look for new issues/PRs, expand navigation state tests if improvement PR merges."
 }
