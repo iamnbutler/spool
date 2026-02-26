@@ -1120,3 +1120,88 @@ impl App {
         self.all_tasks.get(id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- StatusFilter ---
+
+    #[test]
+    fn test_status_filter_cycles() {
+        assert_eq!(StatusFilter::Open.next(), StatusFilter::Complete);
+        assert_eq!(StatusFilter::Complete.next(), StatusFilter::All);
+        assert_eq!(StatusFilter::All.next(), StatusFilter::Open);
+    }
+
+    #[test]
+    fn test_status_filter_full_cycle_returns_to_start() {
+        let start = StatusFilter::Open;
+        let result = start.next().next().next();
+        assert_eq!(result, start);
+    }
+
+    #[test]
+    fn test_status_filter_labels() {
+        assert_eq!(StatusFilter::Open.label(), "Open");
+        assert_eq!(StatusFilter::Complete.label(), "Complete");
+        assert_eq!(StatusFilter::All.label(), "All");
+    }
+
+    // --- SortBy ---
+
+    #[test]
+    fn test_sort_by_cycles() {
+        assert_eq!(SortBy::Priority.next(), SortBy::Created);
+        assert_eq!(SortBy::Created.next(), SortBy::Title);
+        assert_eq!(SortBy::Title.next(), SortBy::Priority);
+    }
+
+    #[test]
+    fn test_sort_by_full_cycle_returns_to_start() {
+        let start = SortBy::Priority;
+        let result = start.next().next().next();
+        assert_eq!(result, start);
+    }
+
+    #[test]
+    fn test_sort_by_labels() {
+        assert_eq!(SortBy::Priority.label(), "Priority");
+        assert_eq!(SortBy::Created.label(), "Created");
+        assert_eq!(SortBy::Title.label(), "Title");
+    }
+
+    // --- EditField ---
+
+    #[test]
+    fn test_edit_field_all_contains_expected_variants() {
+        let fields = EditField::all();
+        assert_eq!(fields.len(), 2);
+        assert!(fields.contains(&EditField::Title));
+        assert!(fields.contains(&EditField::Priority));
+    }
+
+    #[test]
+    fn test_edit_field_labels() {
+        assert_eq!(EditField::Title.label(), "Title");
+        assert_eq!(EditField::Priority.label(), "Priority");
+    }
+
+    // --- Command ---
+
+    #[test]
+    fn test_command_all_contains_expected_variants() {
+        let commands = Command::all();
+        assert_eq!(commands.len(), 3);
+        assert!(commands.contains(&Command::Rebuild));
+        assert!(commands.contains(&Command::Validate));
+        assert!(commands.contains(&Command::Archive));
+    }
+
+    #[test]
+    fn test_command_labels() {
+        assert_eq!(Command::Rebuild.label(), "Rebuild cache");
+        assert_eq!(Command::Validate.label(), "Validate events");
+        assert_eq!(Command::Archive.label(), "Archive old tasks");
+    }
+}
