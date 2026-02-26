@@ -21,7 +21,13 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
 
     // Validate event files
     for file in ctx.get_event_files()? {
-        let filename = file.file_name().unwrap().to_string_lossy().to_string();
+        let filename = file
+            .file_name()
+            .ok_or_else(|| {
+                anyhow::anyhow!("event file path has no filename component: {:?}", file)
+            })?
+            .to_string_lossy()
+            .to_string();
         validate_event_file(
             &file,
             &filename,
@@ -33,7 +39,13 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
 
     // Validate archive files
     for file in ctx.get_archive_files()? {
-        let filename = file.file_name().unwrap().to_string_lossy().to_string();
+        let filename = file
+            .file_name()
+            .ok_or_else(|| {
+                anyhow::anyhow!("archive file path has no filename component: {:?}", file)
+            })?
+            .to_string_lossy()
+            .to_string();
         validate_event_file(
             &file,
             &filename,

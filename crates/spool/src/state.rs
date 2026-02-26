@@ -378,7 +378,13 @@ pub fn build_index(ctx: &SpoolContext) -> Result<Index> {
     let mut task_info: HashMap<String, TaskIndexBuilder> = HashMap::new();
 
     for file in ctx.get_event_files()? {
-        let filename = file.file_name().unwrap().to_string_lossy().to_string();
+        let filename = file
+            .file_name()
+            .ok_or_else(|| {
+                anyhow::anyhow!("event file path has no filename component: {:?}", file)
+            })?
+            .to_string_lossy()
+            .to_string();
         let events = ctx.parse_events_from_file(&file)?;
         for event in events {
             task_files
