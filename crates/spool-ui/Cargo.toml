@@ -15,7 +15,7 @@ name = "spool-ui"
 path = "src/main.rs"
 
 [dependencies]
-spool = { version = "1.0.0", path = "../spool" }
+spool = { version = "1.2.0", path = "../spool" }
 anyhow = "1.0"
 ratatui = "0.29"
 crossterm = "0.28"
