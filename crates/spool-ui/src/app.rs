@@ -1121,9 +1121,65 @@ impl App {
     }
 }
 
+/// Test-only constructor for `App` — bypasses filesystem discovery and uses
+/// an in-memory task list with a non-existent (but structurally valid)
+/// `SpoolContext`. Methods that perform I/O silently ignore errors (e.g.
+/// `load_task_events`), so navigation state logic can be tested without
+/// touching disk.
+#[cfg(test)]
+impl App {
+    fn new_for_test(tasks: Vec<Task>) -> Self {
+        use std::path::PathBuf;
+        let tasks_map: std::collections::HashMap<String, Task> =
+            tasks.iter().map(|t| (t.id.clone(), t.clone())).collect();
+        Self {
+            input_mode: InputMode::Normal,
+            input_buffer: String::new(),
+            message: None,
+            pending_quit: false,
+            show_help: false,
+            show_command_palette: false,
+            command_selected: 0,
+            show_edit_menu: false,
+            edit_field_selected: 0,
+            editing_task_id: None,
+            editing_stream_id: None,
+            pending_delete_stream: None,
+            detail_scroll: 0,
+            detail_content_height: 0,
+            detail_visible_height: 0,
+            tasks,
+            streams: std::collections::HashMap::new(),
+            stream_ids: Vec::new(),
+            stream_filter: None,
+            selected: 0,
+            task_list_state: ListState::default().with_selected(Some(0)),
+            focus: Focus::TaskList,
+            show_detail: false,
+            status_filter: StatusFilter::Open,
+            sort_by: SortBy::Priority,
+            search_query: String::new(),
+            search_mode: false,
+            task_events: Vec::new(),
+            view: View::Tasks,
+            streams_selected: 0,
+            streams_list_state: ListState::default().with_selected(Some(0)),
+            history_events: Vec::new(),
+            history_selected: 0,
+            history_list_state: ListState::default().with_selected(Some(0)),
+            history_scroll_x: 0,
+            history_show_detail: false,
+            history_detail_scroll: 0,
+            all_tasks: tasks_map,
+            ctx: SpoolContext::new(PathBuf::from("/nonexistent")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use spool::state::Task;
 
     // --- StatusFilter ---
 
@@ -1203,5 +1259,125 @@ mod tests {
         assert_eq!(Command::Rebuild.label(), "Rebuild cache");
         assert_eq!(Command::Validate.label(), "Validate events");
         assert_eq!(Command::Archive.label(), "Archive old tasks");
+    }
+
+    // --- App navigation state ---
+
+    fn make_task(id: &str, title: &str) -> Task {
+        Task {
+            id: id.to_string(),
+            title: title.to_string(),
+            ..Task::default()
+        }
+    }
+
+    #[test]
+    fn test_toggle_focus_switches_between_tasklist_and_detail() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.focus, Focus::TaskList);
+        app.toggle_focus();
+        assert_eq!(app.focus, Focus::Detail);
+        app.toggle_focus();
+        assert_eq!(app.focus, Focus::TaskList);
+    }
+
+    #[test]
+    fn test_toggle_detail_shows_and_hides_panel() {
+        let mut app = App::new_for_test(vec![]);
+        assert!(!app.show_detail);
+        app.toggle_detail();
+        assert!(app.show_detail);
+        app.toggle_detail();
+        assert!(!app.show_detail);
+    }
+
+    #[test]
+    fn test_next_task_advances_selection() {
+        let tasks = vec![
+            make_task("t1", "Task 1"),
+            make_task("t2", "Task 2"),
+            make_task("t3", "Task 3"),
+        ];
+        let mut app = App::new_for_test(tasks);
+        assert_eq!(app.selected, 0);
+        app.next_task();
+        assert_eq!(app.selected, 1);
+        app.next_task();
+        assert_eq!(app.selected, 2);
+    }
+
+    #[test]
+    fn test_next_task_clamps_at_last() {
+        let tasks = vec![make_task("t1", "Task 1"), make_task("t2", "Task 2")];
+        let mut app = App::new_for_test(tasks);
+        app.next_task(); // 0 -> 1
+        app.next_task(); // already at last
+        assert_eq!(app.selected, 1);
+    }
+
+    #[test]
+    fn test_previous_task_decrements_selection() {
+        let tasks = vec![
+            make_task("t1", "Task 1"),
+            make_task("t2", "Task 2"),
+            make_task("t3", "Task 3"),
+        ];
+        let mut app = App::new_for_test(tasks);
+        app.selected = 2;
+        app.task_list_state.select(Some(2));
+        app.previous_task();
+        assert_eq!(app.selected, 1);
+    }
+
+    #[test]
+    fn test_previous_task_clamps_at_zero() {
+        let tasks = vec![make_task("t1", "Task 1")];
+        let mut app = App::new_for_test(tasks);
+        app.previous_task();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_first_task_jumps_to_start() {
+        let tasks = vec![
+            make_task("t1", "Task 1"),
+            make_task("t2", "Task 2"),
+            make_task("t3", "Task 3"),
+        ];
+        let mut app = App::new_for_test(tasks);
+        app.selected = 2;
+        app.first_task();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_last_task_jumps_to_end() {
+        let tasks = vec![
+            make_task("t1", "Task 1"),
+            make_task("t2", "Task 2"),
+            make_task("t3", "Task 3"),
+        ];
+        let mut app = App::new_for_test(tasks);
+        app.last_task();
+        assert_eq!(app.selected, 2);
+    }
+
+    #[test]
+    fn test_navigation_on_empty_tasks_is_safe() {
+        let mut app = App::new_for_test(vec![]);
+        app.next_task();
+        app.previous_task();
+        app.first_task();
+        app.last_task();
+        assert_eq!(app.selected, 0);
+    }
+
+    #[test]
+    fn test_selected_task_returns_correct_task() {
+        let tasks = vec![make_task("t1", "Task One"), make_task("t2", "Task Two")];
+        let mut app = App::new_for_test(tasks);
+        assert_eq!(app.selected_task().map(|t| t.id.as_str()), Some("t1"));
+        app.next_task();
+        assert_eq!(app.selected_task().map(|t| t.id.as_str()), Some("t2"));
     }
 }
