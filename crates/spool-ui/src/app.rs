@@ -1380,4 +1380,270 @@ mod tests {
         app.next_task();
         assert_eq!(app.selected_task().map(|t| t.id.as_str()), Some("t2"));
     }
+
+    // --- Input buffer ---
+
+    #[test]
+    fn test_input_char_appends_to_buffer() {
+        let mut app = App::new_for_test(vec![]);
+        app.input_char('h');
+        app.input_char('i');
+        assert_eq!(app.input_buffer, "hi");
+    }
+
+    #[test]
+    fn test_input_backspace_removes_last_char() {
+        let mut app = App::new_for_test(vec![]);
+        app.input_char('a');
+        app.input_char('b');
+        app.input_backspace();
+        assert_eq!(app.input_buffer, "a");
+    }
+
+    #[test]
+    fn test_input_backspace_on_empty_buffer_is_safe() {
+        let mut app = App::new_for_test(vec![]);
+        app.input_backspace(); // must not panic
+        assert_eq!(app.input_buffer, "");
+    }
+
+    #[test]
+    fn test_cancel_input_clears_buffer_and_resets_mode() {
+        let mut app = App::new_for_test(vec![]);
+        app.input_char('x');
+        app.input_mode = InputMode::NewTask;
+        app.cancel_input();
+        assert_eq!(app.input_buffer, "");
+        assert_eq!(app.input_mode, InputMode::Normal);
+    }
+
+    // --- UI overlay toggles ---
+
+    #[test]
+    fn test_toggle_help_flips_show_help() {
+        let mut app = App::new_for_test(vec![]);
+        assert!(!app.show_help);
+        app.toggle_help();
+        assert!(app.show_help);
+        app.toggle_help();
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn test_toggle_command_palette_toggles_and_resets_selection() {
+        let mut app = App::new_for_test(vec![]);
+        app.command_selected = 2;
+        app.toggle_command_palette();
+        assert!(app.show_command_palette);
+        assert_eq!(app.command_selected, 0);
+        app.toggle_command_palette();
+        assert!(!app.show_command_palette);
+    }
+
+    #[test]
+    fn test_clear_message_clears_message_and_pending_quit() {
+        let mut app = App::new_for_test(vec![]);
+        app.message = Some("oops".to_string());
+        app.pending_quit = true;
+        app.clear_message();
+        assert!(app.message.is_none());
+        assert!(!app.pending_quit);
+    }
+
+    #[test]
+    fn test_request_quit_requires_two_presses() {
+        let mut app = App::new_for_test(vec![]);
+        let first = app.request_quit();
+        assert!(!first, "first press should return false (not yet quitting)");
+        assert!(app.pending_quit);
+        let second = app.request_quit();
+        assert!(second, "second press should return true (confirm quit)");
+    }
+
+    // --- Command palette navigation ---
+
+    #[test]
+    fn test_command_next_advances_selection() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.command_selected, 0);
+        app.command_next();
+        assert_eq!(app.command_selected, 1);
+    }
+
+    #[test]
+    fn test_command_next_clamps_at_last_command() {
+        let mut app = App::new_for_test(vec![]);
+        let last = Command::all().len() - 1;
+        app.command_selected = last;
+        app.command_next();
+        assert_eq!(app.command_selected, last);
+    }
+
+    #[test]
+    fn test_command_previous_decrements_selection() {
+        let mut app = App::new_for_test(vec![]);
+        app.command_selected = 2;
+        app.command_previous();
+        assert_eq!(app.command_selected, 1);
+        app.command_previous();
+        assert_eq!(app.command_selected, 0);
+    }
+
+    #[test]
+    fn test_command_previous_clamps_at_zero() {
+        let mut app = App::new_for_test(vec![]);
+        app.command_previous();
+        assert_eq!(app.command_selected, 0);
+    }
+
+    // --- Edit menu navigation ---
+
+    #[test]
+    fn test_edit_menu_next_advances_selection() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.edit_field_selected, 0);
+        app.edit_menu_next();
+        assert_eq!(app.edit_field_selected, 1);
+    }
+
+    #[test]
+    fn test_edit_menu_next_clamps_at_last_field() {
+        let mut app = App::new_for_test(vec![]);
+        let last = EditField::all().len() - 1;
+        app.edit_field_selected = last;
+        app.edit_menu_next();
+        assert_eq!(app.edit_field_selected, last);
+    }
+
+    #[test]
+    fn test_edit_menu_previous_decrements_selection() {
+        let mut app = App::new_for_test(vec![]);
+        app.edit_field_selected = 1;
+        app.edit_menu_previous();
+        assert_eq!(app.edit_field_selected, 0);
+    }
+
+    // --- View navigation ---
+
+    #[test]
+    fn test_next_view_cycles_tasks_streams_history() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.view, View::Tasks);
+        app.next_view();
+        assert_eq!(app.view, View::Streams);
+        app.next_view();
+        assert_eq!(app.view, View::History);
+        app.next_view();
+        assert_eq!(app.view, View::Tasks);
+    }
+
+    #[test]
+    fn test_previous_view_cycles_backwards() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.view, View::Tasks);
+        app.previous_view();
+        assert_eq!(app.view, View::History);
+        app.previous_view();
+        assert_eq!(app.view, View::Streams);
+        app.previous_view();
+        assert_eq!(app.view, View::Tasks);
+    }
+
+    // --- Scroll detail ---
+
+    #[test]
+    fn test_scroll_detail_down_increments_within_bounds() {
+        let mut app = App::new_for_test(vec![]);
+        app.detail_content_height = 20;
+        app.detail_visible_height = 10;
+        assert_eq!(app.detail_scroll, 0);
+        app.scroll_detail_down();
+        assert_eq!(app.detail_scroll, 1);
+    }
+
+    #[test]
+    fn test_scroll_detail_down_clamps_at_max() {
+        let mut app = App::new_for_test(vec![]);
+        app.detail_content_height = 12;
+        app.detail_visible_height = 10;
+        app.detail_scroll = 2; // already at max (12 - 10 = 2)
+        app.scroll_detail_down();
+        assert_eq!(app.detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_scroll_detail_up_decrements_scroll() {
+        let mut app = App::new_for_test(vec![]);
+        app.detail_scroll = 3;
+        app.scroll_detail_up();
+        assert_eq!(app.detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_scroll_detail_up_clamps_at_zero() {
+        let mut app = App::new_for_test(vec![]);
+        app.detail_scroll = 0;
+        app.scroll_detail_up();
+        assert_eq!(app.detail_scroll, 0);
+    }
+
+    // --- Search state ---
+
+    #[test]
+    fn test_toggle_search_flips_search_mode() {
+        let mut app = App::new_for_test(vec![]);
+        assert!(!app.search_mode);
+        app.toggle_search();
+        assert!(app.search_mode);
+        app.toggle_search();
+        assert!(!app.search_mode);
+    }
+
+    #[test]
+    fn test_search_input_updates_query() {
+        let mut app = App::new_for_test(vec![]);
+        app.search_input('r');
+        app.search_input('u');
+        app.search_input('s');
+        app.search_input('t');
+        assert_eq!(app.search_query, "rust");
+    }
+
+    #[test]
+    fn test_search_backspace_removes_last_char() {
+        let mut app = App::new_for_test(vec![]);
+        app.search_query = "hello".to_string();
+        app.search_backspace();
+        assert_eq!(app.search_query, "hell");
+    }
+
+    #[test]
+    fn test_clear_search_empties_query() {
+        let mut app = App::new_for_test(vec![]);
+        app.search_query = "something".to_string();
+        app.clear_search();
+        assert_eq!(app.search_query, "");
+    }
+
+    // --- Status filter and sort cycling via App methods ---
+
+    #[test]
+    fn test_cycle_status_filter_updates_field() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.status_filter, StatusFilter::Open);
+        app.cycle_status_filter();
+        assert_eq!(app.status_filter, StatusFilter::Complete);
+        app.cycle_status_filter();
+        assert_eq!(app.status_filter, StatusFilter::All);
+    }
+
+    #[test]
+    fn test_cycle_sort_updates_field() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.sort_by, SortBy::Priority);
+        app.cycle_sort();
+        assert_eq!(app.sort_by, SortBy::Created);
+        app.cycle_sort();
+        assert_eq!(app.sort_by, SortBy::Title);
+    }
 }
