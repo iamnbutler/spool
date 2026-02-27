@@ -2,6 +2,14 @@
 
 All notable changes to Spool will be documented in this file.
 
+## [1.2.1] - 2026-02-27
+
+### Fixed
+- Replaced `file_name().unwrap()` with proper error handling in `state.rs` and `validation.rs`, eliminating potential panics when processing tasks with non-UTF-8 or unusual file paths (#41)
+
+### Changed
+- Updated dependencies (`cargo update` 2026-02-26) (#42)
+
 ## [1.0.0] - 2026-01-25
 
 ### Added
