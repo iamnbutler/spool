@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-02-26",
-  "last_run": "2026-02-26",
-  "workflow_run_id": "22453495051",
+  "last_updated": "2026-02-27",
+  "last_run": "2026-02-27",
+  "workflow_run_id": "22470010730",
   "monthly_activity_issue": {
     "month": "2026-02",
     "number": 40,
@@ -13,13 +13,13 @@
     "task_2_fix_issues": "2026-02-26",
     "task_3_improvements": "2026-02-26",
     "task_4_deps": "2026-02-26",
-    "task_5_maintain_prs": "2026-02-26",
+    "task_5_maintain_prs": "2026-02-27",
     "task_6_stale_prs": "2026-02-26",
     "task_7_labels": "2026-02-26",
-    "task_8_release": null,
+    "task_8_release": "2026-02-27",
     "task_9_welcome": "2026-02-26",
-    "task_10_forward": "2026-02-26",
-    "task_11_monthly_summary": "2026-02-26"
+    "task_10_forward": "2026-02-27",
+    "task_11_monthly_summary": "2026-02-27"
   },
   "comments_made": {
     "pr_33": {
@@ -60,8 +60,17 @@
       "run": "22453059367",
       "is_repo_assist": true,
       "status": "draft",
-      "note": "PR confirmed as #43. Updated this run (22453495051): added 10 navigation state tests (new_for_test helper + toggle_focus/detail, next/prev/first/last_task, selected_task). 20 tests total in spool-ui, 187 across workspace.",
+      "note": "PR #43. Updated run 22470010730: pushed 27 more tests (input buffer, UI toggles, command palette, edit menu, view cycling, scroll detail, search state, cycle methods). Now 47 tests in spool-ui, 214 across workspace.",
       "ci": "not running (GitHub Actions cannot trigger CI on its own PRs - infrastructure limitation)"
+    },
+    "44": {
+      "title": "[Repo Assist] chore: release v1.2.1",
+      "branch": "repo-assist/release-v1.2.1",
+      "created": "2026-02-27",
+      "run": "22470010730",
+      "is_repo_assist": true,
+      "status": "draft",
+      "note": "Release PR bumping versions 1.2.0→1.2.1 and updating CHANGELOG. Covers merged PRs #41 (fix unwrap panics) and #42 (cargo update). 187 workspace tests pass."
     }
   },
   "merged_prs": {
@@ -91,11 +100,12 @@
     "Bug issue #39: file_name().unwrap() potential panic in state.rs:381 and validation.rs:24,36 (2026-02-26) - CLOSED/FIXED",
     "Fix PR for #39: replace unwrap() with ok_or_else() in state.rs and validation.rs (2026-02-26) - MERGED as PR #41",
     "Deps update: cargo update (2026-02-26) - MERGED as PR #42",
-    "spool-ui test coverage: 20 unit tests (10 enum + 10 navigation) - draft PR #43 open"
+    "spool-ui test coverage: 47 unit tests (10 enum + 10 navigation + 27 new) - draft PR #43 open",
+    "Release prep v1.2.1: bump versions + CHANGELOG - draft PR #44 created (2026-02-27)"
   ],
   "backlog_cursor": {
     "issues": 40,
-    "prs": 43
+    "prs": 44
   },
   "closed_issues": {
     "38": {
@@ -114,12 +124,12 @@
   },
   "task_10_in_progress": {
     "idea": "spool-ui test coverage",
-    "status": "PR #43 open (draft) - 20 tests: enum logic + App navigation state. Next expansion: search state, stream filter, input mode transitions.",
-    "notes": "Draft PR #43 expanded this run with 10 navigation tests using App::new_for_test() helper (no new deps - uses SpoolContext::new with fake path, I/O errors silently ignored). 187 tests pass across workspace. Next: could add search_query tests (search_input, search_backspace, clear_search) and input_mode transition tests (start_new_task, start_new_stream) - these are also pure state mutations when search_mode/input_mode changes don't trigger reload_tasks... actually they DO call reload_tasks. Need to think whether those are feasible without filesystem.",
+    "status": "PR #43 now has 47 tests: enum state + navigation + input buffer + UI toggles + command palette + edit menu + view cycling + scroll detail + search state + cycle methods. 214 tests across workspace.",
+    "notes": "Next expansion possibilities: streams navigation (streams_next/prev/first/last with stream_ids populated manually), stream_filter_label, stream_filter_label with empty streams. Also: close_edit_menu, show_task_edit_menu (with task populated). These require setting up more state but are feasible with new_for_test.",
     "started": "2026-02-26",
-    "updated": "2026-02-26",
+    "updated": "2026-02-27",
     "pr_branch": "repo-assist/improve-spool-ui-tests-3c1deb15482f4abd",
     "pr_number": 43
   },
-  "notes": "PR #41 (fix file_name().unwrap()) was MERGED by iamnbutler. PR #42 (cargo update) was MERGED. Issue #39 CLOSED as completed. PR #43 (spool-ui tests) expanded with navigation state tests this run - now has 20 tests. PR #33 (human PR) still open with merge conflict. Task 8 (release): PR #41 and #42 merged - could consider v1.2.1 release. Next run: release prep (Task 8), check PR #33 status."
+  "notes": "PR #43 (spool-ui tests) now has 47 tests after push this run. PR #44 (release v1.2.1) created as draft. PR #33 (human PR) still open with merge conflict. Task 8 complete. Next run priorities: Task 1 (check for any new issues), Task 6 (stale PR nudge for #33 - it's 15 days old, has merge conflict), Task 7 (check labeling)."
 }
