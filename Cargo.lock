@@ -1374,6 +1374,7 @@ name = "spool-ui"
 version = "1.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "crossterm",
  "notify",
  "ratatui",

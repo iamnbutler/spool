@@ -1646,4 +1646,325 @@ mod tests {
         app.cycle_sort();
         assert_eq!(app.sort_by, SortBy::Title);
     }
+
+    // --- Stream filter label ---
+
+    fn make_stream(id: &str, name: &str) -> spool::state::Stream {
+        spool::state::Stream {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: None,
+            created: chrono::Utc::now(),
+            created_by: "test".to_string(),
+        }
+    }
+
+    fn app_with_streams(names: &[(&str, &str)]) -> App {
+        let mut app = App::new_for_test(vec![]);
+        for (id, name) in names {
+            app.streams.insert(id.to_string(), make_stream(id, name));
+            app.stream_ids.push(id.to_string());
+        }
+        app
+    }
+
+    #[test]
+    fn test_stream_filter_label_none_returns_all() {
+        let app = App::new_for_test(vec![]);
+        assert_eq!(app.stream_filter_label(), "All");
+    }
+
+    #[test]
+    fn test_stream_filter_label_with_known_stream() {
+        let mut app = app_with_streams(&[("s1", "Backend")]);
+        app.stream_filter = Some("s1".to_string());
+        assert_eq!(app.stream_filter_label(), "Backend");
+    }
+
+    #[test]
+    fn test_stream_filter_label_with_unknown_id_falls_back_to_id() {
+        let mut app = App::new_for_test(vec![]);
+        app.stream_filter = Some("unknown-id".to_string());
+        assert_eq!(app.stream_filter_label(), "unknown-id");
+    }
+
+    // --- Streams navigation ---
+
+    #[test]
+    fn test_streams_next_advances_selection() {
+        let mut app = app_with_streams(&[("s1", "A"), ("s2", "B"), ("s3", "C")]);
+        assert_eq!(app.streams_selected, 0);
+        app.streams_next();
+        assert_eq!(app.streams_selected, 1);
+        app.streams_next();
+        assert_eq!(app.streams_selected, 2);
+    }
+
+    #[test]
+    fn test_streams_next_clamps_at_last() {
+        let mut app = app_with_streams(&[("s1", "A"), ("s2", "B")]);
+        app.streams_next(); // 0 -> 1
+        app.streams_next(); // already at last
+        assert_eq!(app.streams_selected, 1);
+    }
+
+    #[test]
+    fn test_streams_previous_decrements_selection() {
+        let mut app = app_with_streams(&[("s1", "A"), ("s2", "B"), ("s3", "C")]);
+        app.streams_selected = 2;
+        app.streams_previous();
+        assert_eq!(app.streams_selected, 1);
+        app.streams_previous();
+        assert_eq!(app.streams_selected, 0);
+    }
+
+    #[test]
+    fn test_streams_previous_clamps_at_zero() {
+        let mut app = app_with_streams(&[("s1", "A")]);
+        app.streams_previous();
+        assert_eq!(app.streams_selected, 0);
+    }
+
+    #[test]
+    fn test_streams_first_jumps_to_start() {
+        let mut app = app_with_streams(&[("s1", "A"), ("s2", "B"), ("s3", "C")]);
+        app.streams_selected = 2;
+        app.streams_first();
+        assert_eq!(app.streams_selected, 0);
+    }
+
+    #[test]
+    fn test_streams_last_jumps_to_end() {
+        let mut app = app_with_streams(&[("s1", "A"), ("s2", "B"), ("s3", "C")]);
+        app.streams_last();
+        assert_eq!(app.streams_selected, 2);
+    }
+
+    #[test]
+    fn test_streams_navigation_on_empty_is_safe() {
+        let mut app = App::new_for_test(vec![]);
+        app.streams_next();
+        app.streams_previous();
+        app.streams_first();
+        app.streams_last();
+        assert_eq!(app.streams_selected, 0);
+    }
+
+    // --- Task edit menu show/close ---
+
+    #[test]
+    fn test_show_task_edit_menu_sets_state() {
+        let tasks = vec![make_task("t1", "Task One")];
+        let mut app = App::new_for_test(tasks);
+        app.show_task_edit_menu();
+        assert!(app.show_edit_menu);
+        assert_eq!(app.editing_task_id, Some("t1".to_string()));
+        assert_eq!(app.edit_field_selected, 0);
+    }
+
+    #[test]
+    fn test_show_task_edit_menu_noop_when_no_tasks() {
+        let mut app = App::new_for_test(vec![]);
+        app.show_task_edit_menu();
+        assert!(!app.show_edit_menu);
+        assert!(app.editing_task_id.is_none());
+    }
+
+    #[test]
+    fn test_close_edit_menu_resets_state() {
+        let tasks = vec![make_task("t1", "Task One")];
+        let mut app = App::new_for_test(tasks);
+        app.show_task_edit_menu();
+        app.edit_field_selected = 1;
+        app.close_edit_menu();
+        assert!(!app.show_edit_menu);
+        assert!(app.editing_task_id.is_none());
+        assert!(app.editing_stream_id.is_none());
+        assert_eq!(app.edit_field_selected, 0);
+    }
+
+    // --- History navigation ---
+
+    fn make_event(id: &str) -> spool::Event {
+        spool::Event {
+            v: 1,
+            op: spool::Operation::Create,
+            id: id.to_string(),
+            ts: chrono::Utc::now(),
+            by: "test".to_string(),
+            branch: "main".to_string(),
+            d: serde_json::Value::Null,
+        }
+    }
+
+    fn app_with_history(count: usize) -> App {
+        let mut app = App::new_for_test(vec![]);
+        for i in 0..count {
+            app.history_events.push(make_event(&format!("e{}", i)));
+        }
+        app
+    }
+
+    #[test]
+    fn test_history_next_advances_selection() {
+        let mut app = app_with_history(3);
+        assert_eq!(app.history_selected, 0);
+        app.history_next();
+        assert_eq!(app.history_selected, 1);
+        app.history_next();
+        assert_eq!(app.history_selected, 2);
+    }
+
+    #[test]
+    fn test_history_next_clamps_at_last() {
+        let mut app = app_with_history(2);
+        app.history_next(); // 0 -> 1
+        app.history_next(); // already at last
+        assert_eq!(app.history_selected, 1);
+    }
+
+    #[test]
+    fn test_history_previous_decrements_selection() {
+        let mut app = app_with_history(3);
+        app.history_selected = 2;
+        app.history_previous();
+        assert_eq!(app.history_selected, 1);
+        app.history_previous();
+        assert_eq!(app.history_selected, 0);
+    }
+
+    #[test]
+    fn test_history_previous_clamps_at_zero() {
+        let mut app = app_with_history(1);
+        app.history_previous();
+        assert_eq!(app.history_selected, 0);
+    }
+
+    #[test]
+    fn test_history_first_jumps_to_start() {
+        let mut app = app_with_history(3);
+        app.history_selected = 2;
+        app.history_first();
+        assert_eq!(app.history_selected, 0);
+    }
+
+    #[test]
+    fn test_history_last_jumps_to_end() {
+        let mut app = app_with_history(3);
+        app.history_last();
+        assert_eq!(app.history_selected, 2);
+    }
+
+    #[test]
+    fn test_history_navigation_on_empty_is_safe() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_next();
+        app.history_previous();
+        app.history_first();
+        app.history_last();
+        assert_eq!(app.history_selected, 0);
+    }
+
+    #[test]
+    fn test_history_scroll_right_increments() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.history_scroll_x, 0);
+        app.history_scroll_right();
+        assert_eq!(app.history_scroll_x, 4);
+    }
+
+    #[test]
+    fn test_history_scroll_right_clamps_at_max() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_scroll_x = 87; // MAX_SCROLL
+        app.history_scroll_right();
+        assert_eq!(app.history_scroll_x, 87);
+    }
+
+    #[test]
+    fn test_history_scroll_left_decrements() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_scroll_x = 8;
+        app.history_scroll_left();
+        assert_eq!(app.history_scroll_x, 4);
+    }
+
+    #[test]
+    fn test_history_scroll_left_clamps_at_zero() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_scroll_left();
+        assert_eq!(app.history_scroll_x, 0);
+    }
+
+    #[test]
+    fn test_toggle_history_detail_flips_flag_and_resets_scroll() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_detail_scroll = 5;
+        app.toggle_history_detail();
+        assert!(app.history_show_detail);
+        assert_eq!(app.history_detail_scroll, 0);
+        app.toggle_history_detail();
+        assert!(!app.history_show_detail);
+    }
+
+    #[test]
+    fn test_close_history_detail_clears_when_open() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_show_detail = true;
+        app.close_history_detail();
+        assert!(!app.history_show_detail);
+    }
+
+    #[test]
+    fn test_close_history_detail_noop_when_already_closed() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_show_detail = false;
+        app.close_history_detail(); // must not panic or toggle
+        assert!(!app.history_show_detail);
+    }
+
+    #[test]
+    fn test_history_detail_scroll_down_increments() {
+        let mut app = App::new_for_test(vec![]);
+        assert_eq!(app.history_detail_scroll, 0);
+        app.history_detail_scroll_down();
+        assert_eq!(app.history_detail_scroll, 1);
+        app.history_detail_scroll_down();
+        assert_eq!(app.history_detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_history_detail_scroll_up_decrements() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_detail_scroll = 3;
+        app.history_detail_scroll_up();
+        assert_eq!(app.history_detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_history_detail_scroll_up_clamps_at_zero() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_detail_scroll_up();
+        assert_eq!(app.history_detail_scroll, 0);
+    }
+
+    #[test]
+    fn test_selected_history_event_returns_correct_event() {
+        let mut app = app_with_history(3);
+        assert_eq!(
+            app.selected_history_event().map(|e| e.id.as_str()),
+            Some("e0")
+        );
+        app.history_next();
+        assert_eq!(
+            app.selected_history_event().map(|e| e.id.as_str()),
+            Some("e1")
+        );
+    }
+
+    #[test]
+    fn test_selected_history_event_none_when_empty() {
+        let app = App::new_for_test(vec![]);
+        assert!(app.selected_history_event().is_none());
+    }
 }
