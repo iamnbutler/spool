@@ -1,25 +1,26 @@
 {
-  "last_updated": "2026-02-28",
-  "last_run": "2026-02-28",
-  "workflow_run_id": "22511286130",
+  "last_updated": "2026-03-01",
+  "last_run": "2026-03-01",
+  "workflow_run_id": "22534032254",
   "monthly_activity_issue": {
-    "month": "2026-02",
-    "number": 40,
-    "title": "[Repo Assist] Monthly Activity 2026-02",
+    "month": "2026-03",
+    "number": 45,
+    "number_note": "inferred (next after PR #44); verify on next run",
+    "title": "[Repo Assist] Monthly Activity 2026-03",
     "label": "repo-assist"
   },
   "tasks_last_run": {
-    "task_1_triage_issues": "2026-02-26",
+    "task_1_triage_issues": "2026-03-01",
     "task_2_fix_issues": "2026-02-26",
     "task_3_improvements": "2026-02-26",
     "task_4_deps": "2026-02-26",
     "task_5_maintain_prs": "2026-02-28",
     "task_6_stale_prs": "2026-02-28",
-    "task_7_labels": "2026-02-26",
+    "task_7_labels": "2026-03-01",
     "task_8_release": "2026-02-27",
     "task_9_welcome": "2026-02-26",
     "task_10_forward": "2026-02-28",
-    "task_11_monthly_summary": "2026-02-28"
+    "task_11_monthly_summary": "2026-03-01"
   },
   "comments_made": {
     "pr_33_review": {
@@ -63,7 +64,7 @@
       "commented": true,
       "labelled": true,
       "stale_nudged": true,
-      "note": "mergeable_state=dirty (merge conflict); 16 days old; stale nudge posted 2026-02-28"
+      "note": "mergeable_state=dirty (merge conflict); stale nudge posted 2026-02-28. PR is now 17+ days old. Label enhancement re-applied 2026-03-01."
     },
     "43": {
       "title": "[Repo Assist] test(spool-ui): add unit tests for App state machine enums",
@@ -72,7 +73,7 @@
       "run": "22453059367",
       "is_repo_assist": true,
       "status": "draft",
-      "note": "PR #43. Updated run 22511286130: pushed 32 more tests (streams navigation, history navigation, edit menu, stream filter label, history scroll/detail). Now 79 tests in spool-ui, 246 across workspace. Added chrono as dev-dependency.",
+      "note": "79 tests in spool-ui, 246 across workspace. Added chrono as dev-dependency.",
       "ci": "not running (GitHub Actions cannot trigger CI on its own PRs - infrastructure limitation)"
     },
     "44": {
@@ -116,7 +117,7 @@
     "Release prep v1.2.1: bump versions + CHANGELOG - draft PR #44 created (2026-02-27)"
   ],
   "backlog_cursor": {
-    "issues": 40,
+    "issues": 45,
     "prs": 44
   },
   "closed_issues": {
@@ -132,6 +133,12 @@
       "closed_by": "iamnbutler",
       "state_reason": "completed",
       "note": "Closed when PR #41 was merged"
+    },
+    "40": {
+      "title": "[Repo Assist] Monthly Activity 2026-02",
+      "closed_at": "2026-03-01",
+      "closed_by": "repo-assist",
+      "reason": "New month — superseded by March 2026 monthly activity issue"
     }
   },
   "task_10_in_progress": {
@@ -143,5 +150,5 @@
     "pr_branch": "repo-assist/improve-spool-ui-tests-3c1deb15482f4abd",
     "pr_number": 43
   },
-  "notes": "PR #43 (spool-ui tests) now has 79 tests after 3 pushes. PR #44 (release v1.2.1) still draft. PR #33 (human PR) has merge conflict + stale nudge posted. Next run priorities: Task 1 (check new issues), Task 7 (labeling check), Task 4 (check for any new deps updates needed)."
+  "notes": "New month: March 2026. Closed Feb issue #40, created March monthly summary (~#45). 3 open PRs: #33 (human, merge conflict, 17+ days old), #43 (spool-ui tests, 79 tests), #44 (release v1.2.1). Next run priorities: Task 2/3 (investigate fixable issues or improvements), Task 4 (deps check), Task 5 (check if #43/#44 need any updates), Task 8 (check if release PR is still current)."
 }
