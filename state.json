@@ -1,26 +1,25 @@
 {
-  "last_updated": "2026-03-01",
-  "last_run": "2026-03-01",
-  "workflow_run_id": "22534032254",
+  "last_updated": "2026-03-02",
+  "last_run": "2026-03-02",
+  "workflow_run_id": "22558771647",
   "monthly_activity_issue": {
     "month": "2026-03",
     "number": 45,
-    "number_note": "inferred (next after PR #44); verify on next run",
     "title": "[Repo Assist] Monthly Activity 2026-03",
     "label": "repo-assist"
   },
   "tasks_last_run": {
     "task_1_triage_issues": "2026-03-01",
     "task_2_fix_issues": "2026-02-26",
-    "task_3_improvements": "2026-02-26",
+    "task_3_improvements": "2026-03-02",
     "task_4_deps": "2026-02-26",
-    "task_5_maintain_prs": "2026-02-28",
+    "task_5_maintain_prs": "2026-03-02",
     "task_6_stale_prs": "2026-02-28",
     "task_7_labels": "2026-03-01",
     "task_8_release": "2026-02-27",
     "task_9_welcome": "2026-02-26",
-    "task_10_forward": "2026-02-28",
-    "task_11_monthly_summary": "2026-03-01"
+    "task_10_forward": "2026-03-02",
+    "task_11_monthly_summary": "2026-03-02"
   },
   "comments_made": {
     "pr_33_review": {
@@ -58,13 +57,13 @@
       "title": "Add inline detail view editing",
       "author": "iamnbutler",
       "created": "2026-02-12",
-      "last_updated": "2026-02-28",
+      "last_updated": "2026-03-01",
       "branch": "feature/tui-detail-editing",
       "is_repo_assist": false,
       "commented": true,
       "labelled": true,
       "stale_nudged": true,
-      "note": "mergeable_state=dirty (merge conflict); stale nudge posted 2026-02-28. PR is now 17+ days old. Label enhancement re-applied 2026-03-01."
+      "note": "Has merge conflict; stale nudge posted 2026-02-28. PR is now 18+ days old."
     },
     "43": {
       "title": "[Repo Assist] test(spool-ui): add unit tests for App state machine enums",
@@ -73,17 +72,25 @@
       "run": "22453059367",
       "is_repo_assist": true,
       "status": "draft",
-      "note": "79 tests in spool-ui, 246 across workspace. Added chrono as dev-dependency.",
-      "ci": "not running (GitHub Actions cannot trigger CI on its own PRs - infrastructure limitation)"
+      "note": "79 spool-ui tests. CI not running (infrastructure limitation)."
     },
     "44": {
       "title": "[Repo Assist] chore: release v1.2.1",
-      "branch": "repo-assist/release-v1.2.1",
+      "branch": "repo-assist/release-v1.2.1-25f976dfecf98bd6",
       "created": "2026-02-27",
       "run": "22470010730",
       "is_repo_assist": true,
       "status": "draft",
-      "note": "Release PR bumping versions 1.2.0->1.2.1 and updating CHANGELOG. Covers merged PRs #41 (fix unwrap panics) and #42 (cargo update). 187 workspace tests pass."
+      "note": "Release PR bumping versions 1.2.0->1.2.1, CHANGELOG. 187 tests passed at creation."
+    },
+    "46": {
+      "title": "[Repo Assist] test(spool-cli): add integration tests for stream commands and list filters",
+      "branch": "repo-assist/improve-cli-stream-tests-a7f3b82e",
+      "created": "2026-03-02",
+      "run": "22558771647",
+      "is_repo_assist": true,
+      "status": "draft",
+      "note": "14 new CLI integration tests: 3 list filter tests + 11 stream command tests. All 181 workspace tests pass (spool-cli: 43 up from 29)."
     }
   },
   "merged_prs": {
@@ -114,11 +121,12 @@
     "Fix PR for #39: replace unwrap() with ok_or_else() in state.rs and validation.rs (2026-02-26) - MERGED as PR #41",
     "Deps update: cargo update (2026-02-26) - MERGED as PR #42",
     "spool-ui test coverage: 79 unit tests (enum + navigation + input buffer + UI toggles + streams + history + edit menu) - draft PR #43 open",
-    "Release prep v1.2.1: bump versions + CHANGELOG - draft PR #44 created (2026-02-27)"
+    "Release prep v1.2.1: bump versions + CHANGELOG - draft PR #44 created (2026-02-27)",
+    "spool-cli stream+filter integration tests: 14 new tests covering all stream commands and list filters - draft PR #46 created (2026-03-02)"
   ],
   "backlog_cursor": {
     "issues": 45,
-    "prs": 44
+    "prs": 46
   },
   "closed_issues": {
     "38": {
@@ -142,13 +150,13 @@
     }
   },
   "task_10_in_progress": {
-    "idea": "spool-ui test coverage",
-    "status": "PR #43 now has 79 tests: enum state + navigation + input buffer + UI toggles + command palette + edit menu + view cycling + scroll detail + search state + cycle methods + streams navigation + history navigation + stream filter label + history scroll + history detail. 246 tests across workspace.",
-    "notes": "Next expansion possibilities: task completion/reopen state (requires mocking writer calls - may be out of scope for pure state tests), stream creation/selection flows (require populated stream_ids). The easy pure-state tests have mostly been covered.",
-    "started": "2026-02-26",
-    "updated": "2026-02-28",
-    "pr_branch": "repo-assist/improve-spool-ui-tests-3c1deb15482f4abd",
-    "pr_number": 43
+    "idea": "CLI stream+filter integration test coverage",
+    "status": "PR #46 created: 14 new spool-cli tests covering stream commands and list filters. All 43 spool-cli integration tests pass.",
+    "notes": "Possible next improvements: spool-ui deeper tests (task completion/reopen mocking), migration.rs tests for pre-0.4.0 path, or doc comments on public API.",
+    "started": "2026-03-02",
+    "updated": "2026-03-02",
+    "pr_branch": "repo-assist/improve-cli-stream-tests-a7f3b82e",
+    "pr_number": 46
   },
-  "notes": "New month: March 2026. Closed Feb issue #40, created March monthly summary (~#45). 3 open PRs: #33 (human, merge conflict, 17+ days old), #43 (spool-ui tests, 79 tests), #44 (release v1.2.1). Next run priorities: Task 2/3 (investigate fixable issues or improvements), Task 4 (deps check), Task 5 (check if #43/#44 need any updates), Task 8 (check if release PR is still current)."
+  "notes": "4 open PRs: #33 (human, merge conflict, 18+ days old), #43 (spool-ui tests), #44 (release v1.2.1), #46 (CLI stream+filter tests - new). No open issues except #45 (monthly summary). Next run priorities: Task 4 (deps check - last done 2026-02-26), Task 2 (any new bugs?), Task 9 (welcome new contributors), Task 6 (stale PR #33 - already nudged once)."
 }
