@@ -500,11 +500,14 @@ fn draw_streams(f: &mut Frame, area: Rect, app: &mut App) {
             let name = stream.map(|s| s.name.as_str()).unwrap_or(stream_id);
             let desc = stream.and_then(|s| s.description.as_deref()).unwrap_or("");
 
-            // Count tasks in this stream
-            let task_count = app
+            // Count open tasks in this stream
+            let open_count = app
                 .all_tasks
                 .values()
-                .filter(|t| t.stream.as_ref() == Some(stream_id))
+                .filter(|t| {
+                    t.stream.as_ref() == Some(stream_id)
+                        && t.status == spool::state::TaskStatus::Open
+                })
                 .count();
 
             let line = Line::from(vec![
@@ -515,7 +518,7 @@ fn draw_streams(f: &mut Frame, area: Rect, app: &mut App) {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
-                    format!("{:4} tasks  ", task_count),
+                    format!("{:4} open   ", open_count),
                     Style::default().fg(Color::DarkGray),
                 ),
                 Span::styled(truncate_str(desc, 40), Style::default().fg(Color::White)),
