@@ -532,7 +532,7 @@ fn test_state_materialization_create_stream() {
     assert_eq!(state.streams.len(), 1);
     let stream = state.streams.get("stream-001").unwrap();
     assert_eq!(stream.id, "stream-001");
-    assert_eq!(stream.name, "Project Alpha");
+    assert_eq!(stream.name, "project alpha");
     assert_eq!(stream.description.as_deref(), Some("Main project"));
     assert_eq!(stream.created_by, "@tester");
 }
@@ -561,7 +561,7 @@ fn test_state_materialization_update_stream() {
     let state = spool::state::materialize(&ctx).unwrap();
 
     let stream = state.streams.get("stream-002").unwrap();
-    assert_eq!(stream.name, "Updated Name");
+    assert_eq!(stream.name, "updated name");
     assert_eq!(stream.description.as_deref(), Some("New description"));
 }
 

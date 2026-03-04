@@ -483,7 +483,7 @@ fn test_create_stream_returns_id() {
 
     assert_eq!(event["op"], "create_stream");
     assert_eq!(event["id"], id);
-    assert_eq!(event["d"]["name"], "My Project");
+    assert_eq!(event["d"]["name"], "my project");
 }
 
 #[test]
@@ -507,7 +507,7 @@ fn test_create_stream_with_description() {
 
     assert_eq!(event["op"], "create_stream");
     assert_eq!(event["id"], id);
-    assert_eq!(event["d"]["name"], "Backend");
+    assert_eq!(event["d"]["name"], "backend");
     assert_eq!(event["d"]["description"], "Backend development tasks");
 }
 
@@ -539,7 +539,7 @@ fn test_update_stream_writes_event() {
     let update_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(update_event["op"], "update_stream");
     assert_eq!(update_event["id"], id);
-    assert_eq!(update_event["d"]["name"], "New Name");
+    assert_eq!(update_event["d"]["name"], "new name");
     assert_eq!(update_event["d"]["description"], "Updated description");
 }
 

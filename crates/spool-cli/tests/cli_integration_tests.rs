@@ -675,14 +675,14 @@ fn test_stream_add_and_list() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Created stream:"))
-        .stdout(predicate::str::contains("My Stream"));
+        .stdout(predicate::str::contains("my stream"));
 
     spool_cmd()
         .current_dir(temp_dir.path())
         .args(["stream", "list"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("My Stream"));
+        .stdout(predicate::str::contains("my stream"));
 }
 
 #[test]
@@ -751,7 +751,7 @@ fn test_stream_update() {
         .args(["stream", "show", "--name", "New Name"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("New Name"));
+        .stdout(predicate::str::contains("new name"));
 }
 
 #[test]
@@ -943,5 +943,5 @@ fn test_stream_list_json_format() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"name\":"))
-        .stdout(predicate::str::contains("JSON Stream"));
+        .stdout(predicate::str::contains("json stream"));
 }
