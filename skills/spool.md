@@ -44,6 +44,9 @@ spool list -p p0
 # Filter by stream (use stream ID)
 spool list --stream <stream-id>
 
+# Filter by stream name
+spool list --stream-name <name>
+
 # List tasks without a stream (orphaned tasks)
 spool list --no-stream
 

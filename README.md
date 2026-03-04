@@ -68,7 +68,8 @@ spool list -s all                   # All tasks
 spool list -s complete              # Completed only
 spool list -a @alice                # By assignee
 spool list -p p0 -t bug             # By priority and tag
-spool list --stream <id>            # By stream
+spool list --stream <id>            # By stream ID
+spool list --stream-name <name>     # By stream name
 spool list --no-stream              # Tasks without a stream
 spool list -f json                  # JSON output
 spool list -f ids                   # IDs only (for scripting)
