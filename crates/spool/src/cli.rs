@@ -191,6 +191,12 @@ pub enum StreamCommands {
         /// Stream ID
         id: String,
     },
+    /// List (or delete with --force) streams with no open tasks
+    Prune {
+        /// Actually delete empty streams; without this flag, only lists which would be pruned
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -791,6 +797,73 @@ pub fn delete_stream(ctx: &SpoolContext, id: &str) -> Result<()> {
     write_delete_stream(ctx, id, &user, &branch)?;
     println!("Deleted stream: {} ({})", stream.name, id);
 
+    Ok(())
+}
+
+/// Prune streams that have no open tasks
+pub fn prune_streams(ctx: &SpoolContext, force: bool) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    // Count open tasks per stream
+    let mut open_counts: std::collections::HashMap<&str, usize> =
+        std::collections::HashMap::new();
+    for task in state.tasks.values() {
+        if let Some(stream_id) = &task.stream {
+            if task.status == TaskStatus::Open {
+                *open_counts.entry(stream_id.as_str()).or_insert(0) += 1;
+            }
+        }
+    }
+
+    // Collect streams with 0 open tasks, sorted by name for deterministic output
+    let mut prunable: Vec<_> = state
+        .streams
+        .values()
+        .filter(|s| open_counts.get(s.id.as_str()).copied().unwrap_or(0) == 0)
+        .collect();
+    prunable.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if prunable.is_empty() {
+        println!("No streams with 0 open tasks to prune.");
+        return Ok(());
+    }
+
+    if !force {
+        println!(
+            "{} stream(s) with 0 open tasks (run with --force to delete):",
+            prunable.len()
+        );
+        for stream in &prunable {
+            let completed = state
+                .tasks
+                .values()
+                .filter(|t| t.stream.as_deref() == Some(&stream.id))
+                .count();
+            println!(
+                "  {} ({}) — {} completed task(s)",
+                stream.name, stream.id, completed
+            );
+        }
+        return Ok(());
+    }
+
+    let user = get_current_user()?;
+    let branch = get_current_branch()?;
+
+    let count = prunable.len();
+    for stream in &prunable {
+        // Unset stream from any completed tasks still assigned to this stream
+        for (task_id, task) in &state.tasks {
+            if task.stream.as_deref() == Some(&stream.id) {
+                write_stream(ctx, task_id, None, &user, &branch)?;
+            }
+        }
+        // Delete the stream
+        write_delete_stream(ctx, &stream.id, &user, &branch)?;
+        println!("Pruned stream: {} ({})", stream.name, stream.id);
+    }
+
+    println!("Pruned {} stream(s).", count);
     Ok(())
 }
 

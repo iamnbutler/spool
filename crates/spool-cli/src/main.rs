@@ -4,8 +4,8 @@ use clap::Parser;
 use spool::archive::archive_tasks;
 use spool::cli::{
     add_stream, add_task, assign_task, claim_task, complete_task, delete_stream, free_task,
-    list_streams, list_tasks, reopen_task, show_stream, show_task, update_stream_cmd, update_task,
-    Cli, Commands, OutputFormat, StreamCommands,
+    list_streams, list_tasks, prune_streams, reopen_task, show_stream, show_task,
+    update_stream_cmd, update_task, Cli, Commands, OutputFormat, StreamCommands,
 };
 use spool::context::{init, SpoolContext};
 use spool::state::rebuild;
@@ -133,6 +133,7 @@ fn main() -> Result<()> {
                     description,
                 } => update_stream_cmd(&ctx, &id, name.as_deref(), description.as_deref()),
                 StreamCommands::Delete { id } => delete_stream(&ctx, &id),
+                StreamCommands::Prune { force } => prune_streams(&ctx, force),
             }
         }
     }
