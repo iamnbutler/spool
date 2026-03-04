@@ -362,6 +362,23 @@ fn test_update_task_not_found() {
 }
 
 #[test]
+fn test_update_task_no_fields_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Some task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["update", "task-001"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No fields to update"));
+}
+
+#[test]
 fn test_rebuild_regenerates_state() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);
@@ -944,4 +961,32 @@ fn test_stream_list_json_format() {
         .success()
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
+}
+
+#[test]
+fn test_stream_update_no_fields_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "My Stream"])
+        .assert()
+        .success();
+
+    let id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success();
+    let stream_id = String::from_utf8_lossy(&id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "update", &stream_id])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No fields to update"));
 }

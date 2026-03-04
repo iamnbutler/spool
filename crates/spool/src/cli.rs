@@ -448,6 +448,12 @@ pub fn update_task(
     priority: Option<&str>,
     stream: Option<&str>,
 ) -> Result<()> {
+    if title.is_none() && description.is_none() && priority.is_none() && stream.is_none() {
+        return Err(anyhow!(
+            "No fields to update. Provide at least one of --title, --description, --priority, or --stream."
+        ));
+    }
+
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -735,6 +741,12 @@ pub fn update_stream_cmd(
     name: Option<&str>,
     description: Option<&str>,
 ) -> Result<()> {
+    if name.is_none() && description.is_none() {
+        return Err(anyhow!(
+            "No fields to update. Provide at least one of --name or --description."
+        ));
+    }
+
     let state = load_or_materialize_state(ctx)?;
 
     // Verify stream exists
