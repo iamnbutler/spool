@@ -1,7 +1,7 @@
 {
   "last_updated": "2026-03-04",
   "last_run": "2026-03-04",
-  "workflow_run_id": "22650184155",
+  "workflow_run_id": "22650506840",
   "monthly_activity_issue": {
     "month": "2026-03",
     "number": 45,
@@ -11,14 +11,14 @@
   "tasks_last_run": {
     "task_1_triage_issues": "2026-03-04",
     "task_2_fix_issues": "2026-03-04",
-    "task_3_improvements": "2026-03-02",
+    "task_3_improvements": "2026-03-04",
     "task_4_deps": "2026-03-03",
     "task_5_maintain_prs": "2026-03-04",
     "task_6_stale_prs": "2026-02-28",
     "task_7_labels": "2026-03-04",
-    "task_8_release": "2026-02-27",
+    "task_8_release": "2026-03-04",
     "task_9_welcome": "2026-02-26",
-    "task_10_forward": "2026-03-02",
+    "task_10_forward": "2026-03-04",
     "task_11_monthly_summary": "2026-03-04"
   },
   "comments_made": {
@@ -55,7 +55,7 @@
     "issue_50": {
       "date": "2026-03-04",
       "run": "22650184155",
-      "summary": "Confirmed TUI bug: draw_streams() counts all tasks not just open; fix PR created (repo-assist/fix-issue-50-stream-open-count)"
+      "summary": "Confirmed TUI bug: draw_streams() counts all tasks not just open; fix PR #53 created"
     },
     "issue_51": {
       "date": "2026-03-04",
@@ -84,14 +84,34 @@
   },
   "open_prs": {
     "fix_50": {
-      "title": "fix(spool-ui): show open task count instead of total in streams view",
-      "branch": "repo-assist/fix-issue-50-stream-open-count",
+      "number": 53,
+      "title": "[Repo Assist] fix(spool-ui): show open task count instead of total in streams view",
+      "branch": "repo-assist/fix-issue-50-stream-open-count-b4091b2b62643f18",
       "created": "2026-03-04",
       "run": "22650184155",
       "is_repo_assist": true,
       "status": "draft",
       "closes": 50,
       "note": "All 260 workspace tests pass. TUI draw_streams() now filters to TaskStatus::Open only."
+    },
+    "filter_context_52": {
+      "title": "[Repo Assist] feat(spool-cli): show active filter context in spool list output",
+      "branch": "repo-assist/improve-list-filter-context",
+      "created": "2026-03-04",
+      "run": "22650506840",
+      "is_repo_assist": true,
+      "status": "draft",
+      "closes": 52,
+      "note": "All 267 workspace tests pass (7 new). Adds 'Filtered by: ...' context line to spool list table output."
+    },
+    "release_v1_2_1": {
+      "title": "[Repo Assist] chore: release v1.2.1",
+      "branch": "repo-assist/release-v1.2.1",
+      "created": "2026-03-04",
+      "run": "22650506840",
+      "is_repo_assist": true,
+      "status": "draft",
+      "note": "CHANGELOG updated for v1.2.1, all crate versions bumped from 1.2.0 to 1.2.1. All 260 workspace tests pass."
     }
   },
   "merged_prs": {
@@ -133,7 +153,7 @@
       "title": "[Repo Assist] chore: release v1.2.1",
       "closed_at": "2026-03-04",
       "merged": false,
-      "note": "Closed by maintainer without merge; release prep needed again for v1.2.1 or v1.3.0"
+      "note": "Closed by maintainer without merge; superseded by new release PR on branch repo-assist/release-v1.2.1 (2026-03-04)"
     }
   },
   "fix_attempts": {
@@ -148,9 +168,18 @@
       "date": "2026-03-04",
       "run": "22650184155",
       "status": "pr_created",
-      "branch": "repo-assist/fix-issue-50-stream-open-count",
+      "pr_number": 53,
+      "branch": "repo-assist/fix-issue-50-stream-open-count-b4091b2b62643f18",
       "closes": 50,
       "note": "draw_streams() filtered to TaskStatus::Open only. All 260 tests pass."
+    },
+    "list_filter_context": {
+      "date": "2026-03-04",
+      "run": "22650506840",
+      "status": "pr_created",
+      "branch": "repo-assist/improve-list-filter-context",
+      "closes": 52,
+      "note": "Added 'Filtered by: ...' context line to spool list table output. All 267 tests pass (7 new)."
     }
   },
   "improvement_ideas_submitted": [
@@ -162,7 +191,9 @@
     "Release prep v1.2.1 - CLOSED (not merged) as PR #44",
     "spool-cli stream+filter integration tests: 14 new tests - MERGED as PR #46",
     "Deps update: cargo update (2026-03-03) - MERGED as PR #47",
-    "TUI stream count bug fix: show open tasks only (closes #50) - draft PR created branch repo-assist/fix-issue-50-stream-open-count (2026-03-04)"
+    "TUI stream count bug fix: show open tasks only (closes #50) - draft PR #53 (2026-03-04)",
+    "spool list filter context header (closes #52) - draft PR created branch repo-assist/improve-list-filter-context (2026-03-04)",
+    "Release prep v1.2.1 (redo) - draft PR created branch repo-assist/release-v1.2.1 (2026-03-04)"
   ],
   "backlog_cursor": {
     "issues": 52,
@@ -190,11 +221,11 @@
     }
   },
   "task_10_in_progress": {
-    "idea": "Release preparation v1.2.1/v1.3.0",
-    "status": "Pending — PRs #41, #42, #43, #46, #47 merged since last release. Old release PR #44 was closed. Need to prepare new release PR.",
-    "notes": "Other candidates: CLI filter context header for spool list (closes #52), stream name normalization (closes #49 after casing convention confirmed), spool stream prune (closes #51).",
+    "idea": "Implement enhancements from user feedback session (#48-52)",
+    "status": "In progress — filter context PR created (closes #52), release v1.2.1 PR created. Still pending: stream name normalization (#49, needs casing convention from maintainer), spool stream prune (#51), spool start command (#48).",
+    "notes": "Stream name normalization: kebab-case seems natural given spool's naming style. Could normalize on create_stream and update_stream events. Needs maintainer sign-off first.",
     "started": "2026-03-04",
     "updated": "2026-03-04"
   },
-  "notes": "1 open Repo Assist PR: fix-issue-50 (TUI stream count). Open issues: #45 (monthly summary), #48-52 (all new from 2026-03-04 user feedback session, now labeled and commented). Next run priorities: Task 9 (welcome new contributors - last done 2026-02-26), Task 8 (release prep - last done 2026-02-27, #44 was closed so needs redo), Task 6 (stale PR nudges - last done 2026-02-28 but no open PRs currently to nudge). Consider implementing fix for #52 (CLI filter header) or #49 (stream name normalization)."
+  "notes": "3 open Repo Assist PRs: #53 (TUI stream count fix), improve-list-filter-context (closes #52), release-v1.2.1. All issues #48-52 commented. Next run priorities: Task 9 (welcome - last 2026-02-26, but no new contributors visible), Task 6 (stale PRs - last 2026-02-28, no non-Repo-Assist PRs open), Task 4 (deps - last 2026-03-03). For Task 2/10: could implement stream name normalization for #49 (normalization to lowercase/kebab on create/update) - but confirm with maintainer first via issue comment."
 }
