@@ -337,7 +337,7 @@ fn apply_event(
                     .get("name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
-                    .to_string(),
+                    .to_lowercase(),
                 description: d
                     .get("description")
                     .and_then(|v| v.as_str())
@@ -351,7 +351,7 @@ fn apply_event(
             if let Some(stream) = streams.get_mut(&event.id) {
                 let d = &event.d;
                 if let Some(name) = d.get("name").and_then(|v| v.as_str()) {
-                    stream.name = name.to_string();
+                    stream.name = name.to_lowercase();
                 }
                 if let Some(desc) = d.get("description").and_then(|v| v.as_str()) {
                     stream.description = Some(desc.to_string());

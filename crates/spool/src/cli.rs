@@ -597,9 +597,10 @@ pub fn free_task(ctx: &SpoolContext, id: &str) -> Result<()> {
 pub fn add_stream(ctx: &SpoolContext, name: &str, description: Option<&str>) -> Result<()> {
     let user = get_current_user()?;
     let branch = get_current_branch()?;
+    let normalized = name.to_lowercase();
 
-    let id = write_create_stream(ctx, name, description, &user, &branch)?;
-    println!("Created stream: {} ({})", name, id);
+    let id = write_create_stream(ctx, &normalized, description, &user, &branch)?;
+    println!("Created stream: {} ({})", normalized, id);
 
     Ok(())
 }
@@ -679,7 +680,7 @@ pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> 
         (None, Some(name)) => state
             .streams
             .values()
-            .find(|s| s.name == name)
+            .find(|s| s.name.eq_ignore_ascii_case(name))
             .ok_or_else(|| anyhow!("Stream not found with name: {}", name))?,
         (None, None) => return Err(anyhow!("Either stream ID or --name must be provided")),
     };

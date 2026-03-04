@@ -262,9 +262,10 @@ pub fn create_stream(
     branch: &str,
 ) -> Result<String> {
     let id = generate_id();
+    let normalized_name = name.to_lowercase();
 
     let mut d = serde_json::json!({
-        "name": name,
+        "name": normalized_name,
     });
 
     if let Some(desc) = description {
@@ -298,7 +299,10 @@ pub fn update_stream(
     let mut d = serde_json::Map::new();
 
     if let Some(n) = name {
-        d.insert("name".to_string(), serde_json::Value::String(n.to_string()));
+        d.insert(
+            "name".to_string(),
+            serde_json::Value::String(n.to_lowercase()),
+        );
     }
     if let Some(desc) = description {
         d.insert(
