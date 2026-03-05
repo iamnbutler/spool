@@ -805,8 +805,7 @@ pub fn prune_streams(ctx: &SpoolContext, force: bool) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Count open tasks per stream
-    let mut open_counts: std::collections::HashMap<&str, usize> =
-        std::collections::HashMap::new();
+    let mut open_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     for task in state.tasks.values() {
         if let Some(stream_id) = &task.stream {
             if task.status == TaskStatus::Open {
