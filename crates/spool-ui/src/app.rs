@@ -420,34 +420,46 @@ impl App {
 
     pub fn cycle_status_filter(&mut self) {
         self.status_filter = self.status_filter.next();
-        let _ = self.reload_tasks();
+        if let Err(e) = self.reload_tasks() {
+            self.message = Some(format!("Reload failed: {}", e));
+        }
     }
 
     pub fn cycle_sort(&mut self) {
         self.sort_by = self.sort_by.next();
-        let _ = self.reload_tasks();
+        if let Err(e) = self.reload_tasks() {
+            self.message = Some(format!("Reload failed: {}", e));
+        }
     }
 
     pub fn toggle_search(&mut self) {
         self.search_mode = !self.search_mode;
         if !self.search_mode && !self.search_query.is_empty() {
-            let _ = self.reload_tasks();
+            if let Err(e) = self.reload_tasks() {
+                self.message = Some(format!("Reload failed: {}", e));
+            }
         }
     }
 
     pub fn search_input(&mut self, c: char) {
         self.search_query.push(c);
-        let _ = self.reload_tasks();
+        if let Err(e) = self.reload_tasks() {
+            self.message = Some(format!("Reload failed: {}", e));
+        }
     }
 
     pub fn search_backspace(&mut self) {
         self.search_query.pop();
-        let _ = self.reload_tasks();
+        if let Err(e) = self.reload_tasks() {
+            self.message = Some(format!("Reload failed: {}", e));
+        }
     }
 
     pub fn clear_search(&mut self) {
         self.search_query.clear();
-        let _ = self.reload_tasks();
+        if let Err(e) = self.reload_tasks() {
+            self.message = Some(format!("Reload failed: {}", e));
+        }
     }
 
     pub fn stream_filter_label(&self) -> String {
@@ -476,7 +488,9 @@ impl App {
             match writer::complete_task(&self.ctx, &id, None, &by, &branch) {
                 Ok(()) => {
                     self.message = Some(format!("Completed: {}", id));
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -498,7 +512,9 @@ impl App {
             match writer::reopen_task(&self.ctx, &id, &by, &branch) {
                 Ok(()) => {
                     self.message = Some(format!("Reopened: {}", id));
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -594,7 +610,9 @@ impl App {
             match result {
                 Ok(()) => {
                     self.message = Some("Task updated".to_string());
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -616,7 +634,9 @@ impl App {
             match writer::assign_task(&self.ctx, &id, Some(&by), &by, &branch) {
                 Ok(()) => {
                     self.message = Some(format!("Claimed: {}", id));
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -638,7 +658,9 @@ impl App {
             match writer::assign_task(&self.ctx, &id, None, &by, &branch) {
                 Ok(()) => {
                     self.message = Some(format!("Unassigned: {}", id));
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -675,7 +697,9 @@ impl App {
                         None => "Unassigned".to_string(),
                     };
                     self.message = Some(msg);
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -717,7 +741,9 @@ impl App {
         match writer::create_task(&self.ctx, params, &by, &branch) {
             Ok(id) => {
                 self.message = Some(format!("Created: {}", id));
-                let _ = self.reload_tasks();
+                if let Err(e) = self.reload_tasks() {
+                    self.message = Some(format!("Reload failed: {}", e));
+                }
             }
             Err(e) => {
                 self.message = Some(format!("Error: {}", e));
@@ -770,7 +796,9 @@ impl App {
                 Command::Rebuild => match rebuild(&self.ctx) {
                     Ok(()) => {
                         self.message = Some("Cache rebuilt successfully".to_string());
-                        let _ = self.reload_tasks();
+                        if let Err(e) = self.reload_tasks() {
+                            self.message = Some(format!("Reload failed: {}", e));
+                        }
                     }
                     Err(e) => {
                         self.message = Some(format!("Rebuild failed: {}", e));
@@ -796,7 +824,9 @@ impl App {
                     Ok(archived_ids) => {
                         if !archived_ids.is_empty() {
                             self.message = Some(format!("Archived {} tasks", archived_ids.len()));
-                            let _ = self.reload_tasks();
+                            if let Err(e) = self.reload_tasks() {
+                                self.message = Some(format!("Reload failed: {}", e));
+                            }
                         } else {
                             self.message = Some("No tasks to archive".to_string());
                         }
@@ -894,7 +924,9 @@ impl App {
         if let Some(stream_id) = self.stream_ids.get(self.streams_selected) {
             self.stream_filter = Some(stream_id.clone());
             self.view = View::Tasks;
-            let _ = self.reload_tasks();
+            if let Err(e) = self.reload_tasks() {
+                self.message = Some(format!("Reload failed: {}", e));
+            }
         }
     }
 
@@ -917,8 +949,11 @@ impl App {
         match writer::create_stream(&self.ctx, self.input_buffer.trim(), None, &by, &branch) {
             Ok(id) => {
                 self.message = Some(format!("Created stream: {}", self.input_buffer.trim()));
-                let _ = self.reload_tasks(); // This also reloads streams
-                                             // Select the new stream
+                // This also reloads streams
+                if let Err(e) = self.reload_tasks() {
+                    self.message = Some(format!("Reload failed: {}", e));
+                }
+                // Select the new stream
                 if let Some(pos) = self.stream_ids.iter().position(|s| s == &id) {
                     self.streams_selected = pos;
                 }
@@ -963,7 +998,9 @@ impl App {
             ) {
                 Ok(()) => {
                     self.message = Some("Stream updated".to_string());
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                 }
                 Err(e) => {
                     self.message = Some(format!("Error: {}", e));
@@ -1015,7 +1052,9 @@ impl App {
             match writer::delete_stream(&self.ctx, &stream_id, &by, &branch) {
                 Ok(()) => {
                     self.message = Some("Stream deleted".to_string());
-                    let _ = self.reload_tasks();
+                    if let Err(e) = self.reload_tasks() {
+                        self.message = Some(format!("Reload failed: {}", e));
+                    }
                     // Adjust selection if needed
                     if self.streams_selected >= self.stream_ids.len() && !self.stream_ids.is_empty()
                     {
