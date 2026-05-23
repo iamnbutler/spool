@@ -71,7 +71,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
         if watcher_rx.try_recv().is_ok() {
             // Drain any additional pending events to avoid multiple reloads
             while watcher_rx.try_recv().is_ok() {}
-            let _ = app.reload_tasks();
+            if let Err(e) = app.reload_tasks() {
+                app.message = Some(format!("Reload failed: {}", e));
+            }
         }
 
         // Poll for keyboard events with timeout
@@ -299,7 +301,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                                     app.clear_search();
                                 } else if app.stream_filter.is_some() {
                                     app.stream_filter = None;
-                                    let _ = app.reload_tasks();
+                                    if let Err(e) = app.reload_tasks() {
+                                        app.message = Some(format!("Reload failed: {}", e));
+                                    }
                                 } else if app.request_quit() {
                                     return Ok(());
                                 }
