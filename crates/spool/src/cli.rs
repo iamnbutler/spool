@@ -148,6 +148,8 @@ pub enum Commands {
         /// Task ID to free
         id: String,
     },
+    /// Show task statistics summary
+    Stats,
 }
 
 /// Stream subcommands for managing workstreams/projects
@@ -790,6 +792,104 @@ pub fn delete_stream(ctx: &SpoolContext, id: &str) -> Result<()> {
 
     write_delete_stream(ctx, id, &user, &branch)?;
     println!("Deleted stream: {} ({})", stream.name, id);
+
+    Ok(())
+}
+
+/// Show a summary of task counts by status, stream, and priority
+pub fn task_stats(ctx: &SpoolContext) -> Result<()> {
+    let state = load_or_materialize_state(ctx)?;
+
+    let all_tasks: Vec<&Task> = state.tasks.values().collect();
+    let open_count = all_tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Open && t.archived.is_none())
+        .count();
+    let complete_count = all_tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Complete && t.archived.is_none())
+        .count();
+    let archived_count = all_tasks.iter().filter(|t| t.archived.is_some()).count();
+
+    println!(
+        "Tasks: {} open, {} complete, {} archived",
+        open_count, complete_count, archived_count
+    );
+
+    // By stream (excluding archived tasks)
+    if !state.streams.is_empty() {
+        let mut streams: Vec<_> = state.streams.values().collect();
+        streams.sort_by_key(|s| &s.name);
+
+        let mut stream_open: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+        let mut stream_complete: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+
+        for task in state.tasks.values() {
+            if task.archived.is_some() {
+                continue;
+            }
+            if let Some(sid) = &task.stream {
+                let bucket = if task.status == TaskStatus::Open {
+                    &mut stream_open
+                } else {
+                    &mut stream_complete
+                };
+                *bucket.entry(sid.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        println!("\nBy stream:");
+        for stream in &streams {
+            let o = stream_open.get(stream.id.as_str()).copied().unwrap_or(0);
+            let c = stream_complete
+                .get(stream.id.as_str())
+                .copied()
+                .unwrap_or(0);
+            println!("  {:<20} {} open, {} complete", stream.name, o, c);
+        }
+
+        let unstreamed_open = all_tasks
+            .iter()
+            .filter(|t| t.status == TaskStatus::Open && t.archived.is_none() && t.stream.is_none())
+            .count();
+        let unstreamed_complete = all_tasks
+            .iter()
+            .filter(|t| {
+                t.status == TaskStatus::Complete && t.archived.is_none() && t.stream.is_none()
+            })
+            .count();
+        if unstreamed_open > 0 || unstreamed_complete > 0 {
+            println!(
+                "  {:<20} {} open, {} complete",
+                "(none)", unstreamed_open, unstreamed_complete
+            );
+        }
+    }
+
+    // By priority (open non-archived tasks only)
+    let open_tasks: Vec<&&Task> = all_tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Open && t.archived.is_none())
+        .collect();
+
+    if !open_tasks.is_empty() {
+        println!("\nOpen by priority:");
+        for p in &["p0", "p1", "p2", "p3"] {
+            let count = open_tasks
+                .iter()
+                .filter(|t| t.priority.as_deref() == Some(p))
+                .count();
+            if count > 0 {
+                println!("  {}: {}", p, count);
+            }
+        }
+        let unprioritized = open_tasks.iter().filter(|t| t.priority.is_none()).count();
+        if unprioritized > 0 {
+            println!("  (none): {}", unprioritized);
+        }
+    }
 
     Ok(())
 }
