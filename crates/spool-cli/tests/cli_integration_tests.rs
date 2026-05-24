@@ -945,3 +945,152 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+// Stats command tests
+
+#[test]
+fn test_stats_empty_repo() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Tasks: 0 open, 0 complete, 0 archived",
+        ));
+}
+
+#[test]
+fn test_stats_counts_open_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Add two tasks
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "First task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Second task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Tasks: 2 open, 0 complete, 0 archived",
+        ));
+}
+
+#[test]
+fn test_stats_counts_complete_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Add a task then complete it
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Task to complete"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let task_id = String::from_utf8_lossy(&output)
+        .trim()
+        .replace("Created task: ", "");
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["complete", task_id.trim()])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Tasks: 0 open, 1 complete, 0 archived",
+        ));
+}
+
+#[test]
+fn test_stats_shows_priority_breakdown() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "High priority task", "--priority", "p0"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Normal task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Open by priority:"))
+        .stdout(predicate::str::contains("p0: 1"))
+        .stdout(predicate::str::contains("(none): 1"));
+}
+
+#[test]
+fn test_stats_shows_stream_breakdown() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream
+    let stream_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "my-project"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stream_id = String::from_utf8_lossy(&stream_output)
+        .trim()
+        .replace("Created stream: my-project (", "")
+        .replace(')', "");
+
+    // Add a task in the stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Stream task", "--stream", stream_id.trim()])
+        .assert()
+        .success();
+
+    // Add a task without stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Unstreamed task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("By stream:"))
+        .stdout(predicate::str::contains("my-project"))
+        .stdout(predicate::str::contains("(none)"));
+}
