@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-25",
-  "last_run_id": "26380016944",
+  "last_run": "2026-05-26",
+  "last_run_id": "26428713719",
   "monthly_activity_issue": 84,
   "monthly_activity_month": "2026-05",
   "backlog_cursor": null,
@@ -52,8 +52,8 @@
     "71": ["help wanted"]
   },
   "pr_ci_status": {
-    "note": "29 open PRs total (25 Repo Assist + PR #62, 4 Maintainer). All PRs based on main SHA 5b7e3a2. Verified clean 2026-05-23. Maintainer PRs #68, #69, #72 fail cargo fmt --check (need manual fix). PR #67 passes clean. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
-    "checked": "2026-05-23",
+    "note": "29 open PRs total (25 Repo Assist + PR #62, 4 Maintainer). All PRs based on main SHA 5b7e3a2. Verified clean 2026-05-26. Maintainer PRs #68, #69, #72 fail cargo fmt --check (need manual fix). PR #67 passes clean. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
+    "checked": "2026-05-26",
     "maintainer_pr_ci": {
       "67": "pass:clean",
       "68": "cargo_fmt_needed:cannot_push:commented_2026-05-07",
@@ -68,7 +68,7 @@
     "validation-extension-opportunity": "DONE — PR #86 extends validation.rs to check priority (p0-p3), assignee (@-prefix for d.assignee and d.to), resolution (done/wontfix/duplicate/obsolete). All as warnings. 7 new tests, 267 total pass.",
     "push-to-pr-title-constraint": "push_to_pull_request_branch requires PR title to start with '[Repo Assist]'. Cannot push to maintainer PRs #68/#69/#72. This was causing repeated failures on 2026-05-04/05/06 runs (all reported in issue #73).",
     "pr62-not-draft": "PR #62 (spool block/unblock) is NOT marked as draft — it is a regular open PR ready for review. Created 2026-03-10.",
-    "all-prs-on-current-main": "All PRs verified 2026-05-23 as based on main SHA 5b7e3a2. All have mergeable_state: clean.",
+    "all-prs-on-current-main": "All PRs verified 2026-05-26 as based on main SHA 5b7e3a2. All have mergeable_state: clean.",
     "cli-list-sort-gap-closed": "PR #85 adds --sort flag to spool list (priority/title/updated/created). TUI already had sort; CLI now has parity.",
     "empty-name-validation-gap": "FIXED — PR #87 (2026-05-18) adds checks in add_task() and add_stream() to reject empty/whitespace-only names with 4 new integration tests.",
     "combined-filter-tests-gap": "FIXED — PR #88 (2026-05-19) adds apply_filters_and_sort test helper + 15 combined filter tests (status+stream+search intersections, sort correctness). 94 spool-ui tests pass.",
@@ -77,23 +77,24 @@
     "release-pr55-branch": "PR #55 head commit a9d0fa4 on branch repo-assist/release-v1.2.1-74e2acfcd3cf1599 — CHANGELOG correct.",
     "pre-existing-clippy-warnings": "3 collapsible_match warnings in crates/spool/src/state.rs (lines 252, 257, 279) — present on main before any Repo Assist changes.",
     "shell-completion-gap": "spool has no shell completion support (no clap_complete dependency). Filing an issue requires new dependency discussion first per AGENTS.md. Defer until PR backlog reduces.",
-    "no-quiet-or-color-flags": "spool CLI has no --quiet or --no-color global flags. Per-command -f flag exists for output format control."
+    "no-quiet-or-color-flags": "spool CLI has no --quiet or --no-color global flags. Per-command -f flag exists for output format control.",
+    "assign-task-writer-test-gap": "assign_task() in writer.rs has no direct test in writer_tests.rs. State materialization is tested via state_tests.rs. Low priority gap given coverage elsewhere."
   },
   "task_last_run": {
-    "task1_triage": "2026-05-22",
+    "task1_triage": "2026-05-26",
     "task2_fix_issues": "2026-05-25",
     "task3_improvements": "2026-05-24",
     "task4_deps": "2026-05-22",
-    "task5_maintain_prs": "2026-05-25",
+    "task5_maintain_prs": "2026-05-26",
     "task6_stale_nudges": "2026-05-25",
-    "task7_labels": "2026-05-22",
-    "task8_release": "2026-05-22",
+    "task7_labels": "2026-05-26",
+    "task8_release": "2026-05-26",
     "task9_welcome": "2026-05-25",
     "task10_forward": "2026-05-23",
-    "task11_monthly_summary": "2026-05-25"
+    "task11_monthly_summary": "2026-05-26"
   },
   "deps_last_checked": "2026-05-22",
   "deps_pr": 60,
   "deps_pr_branch": "repo-assist/deps-update-2026-03-05-7ddf94a021c0519c",
-  "notes": "May 2026. Run 2026-05-25: Tasks 2/5/6/9/11. All fixable issues have open PRs; maintainer PRs #68/#69/#72 already nudged (last 2026-05-07); no new contributors; main unchanged at SHA 5b7e3a2, all 29 PRs clean. Updated monthly activity issue #84. Deps next check ~2026-05-29. Do NOT try push_to_pull_request_branch on PRs #68/#69/#72 ever again. 29 total PRs: 25 Repo Assist + PR #62, 4 Maintainer. Next round-robin priority: task1_triage (2026-05-22), task4_deps (2026-05-22), task7_labels (2026-05-22), task8_release (2026-05-22), task10_forward (2026-05-23), task3_improvements (2026-05-24)."
+  "notes": "May 2026. Run 2026-05-26: Tasks 1/5/7/8/11. All 9 issues have RA comments, no new activity. All 29 PRs correctly labeled and based on main SHA 5b7e3a2 (clean). Release PR #55 still valid. Monthly summary updated. Deps next check ~2026-05-29. Do NOT try push_to_pull_request_branch on PRs #68/#69/#72 ever again. 29 total PRs: 25 Repo Assist + PR #62, 4 Maintainer. Next round-robin priority: task2_fix_issues (2026-05-25), task6_stale_nudges (2026-05-25), task9_welcome (2026-05-25), task3_improvements (2026-05-24), task10_forward (2026-05-23)."
 }
