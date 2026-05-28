@@ -5,6 +5,7 @@ use spool::event::Event;
 use spool::state::{load_or_materialize_state, Stream, Task, TaskStatus};
 use spool::writer::{self, CreateTaskParams};
 use spool::{archive, init, rebuild, validation};
+use std::cmp::Reverse;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
@@ -330,10 +331,10 @@ impl App {
                 });
             }
             SortBy::Created => {
-                tasks.sort_by(|a, b| b.created.cmp(&a.created));
+                tasks.sort_by_key(|t| Reverse(t.created));
             }
             SortBy::Title => {
-                tasks.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+                tasks.sort_by_key(|t| t.title.to_lowercase());
             }
         }
     }
@@ -1047,7 +1048,7 @@ impl App {
         let events_by_task = spool::archive::collect_all_events(&self.ctx)?;
         let mut all_events: Vec<Event> = events_by_task.into_values().flatten().collect();
         // Sort by timestamp descending (most recent first)
-        all_events.sort_by(|a, b| b.ts.cmp(&a.ts));
+        all_events.sort_by_key(|e| Reverse(e.ts));
         self.history_events = all_events;
         self.history_selected = 0;
         self.history_list_state.select(Some(0));
