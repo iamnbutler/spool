@@ -238,16 +238,12 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                             KeyCode::Char('l') | KeyCode::Right => app.history_scroll_right(),
                             KeyCode::Left => app.history_scroll_left(),
                             KeyCode::Enter => app.toggle_history_detail(),
-                            KeyCode::Tab => {
+                            KeyCode::Tab if app.history_show_detail => {
                                 // Allow navigating list even when detail is open
-                                if app.history_show_detail {
-                                    app.history_next();
-                                }
+                                app.history_next();
                             }
-                            KeyCode::BackTab => {
-                                if app.history_show_detail {
-                                    app.history_previous();
-                                }
+                            KeyCode::BackTab if app.history_show_detail => {
+                                app.history_previous();
                             }
                             _ => {}
                         },

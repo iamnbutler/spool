@@ -248,15 +248,11 @@ fn apply_event(
                     d.get("target").and_then(|v| v.as_str()),
                 ) {
                     match rel {
-                        "blocks" => {
-                            if !task.blocks.contains(&target.to_string()) {
-                                task.blocks.push(target.to_string());
-                            }
+                        "blocks" if !task.blocks.contains(&target.to_string()) => {
+                            task.blocks.push(target.to_string());
                         }
-                        "blocked_by" => {
-                            if !task.blocked_by.contains(&target.to_string()) {
-                                task.blocked_by.push(target.to_string());
-                            }
+                        "blocked_by" if !task.blocked_by.contains(&target.to_string()) => {
+                            task.blocked_by.push(target.to_string());
                         }
                         "parent" => task.parent = Some(target.to_string()),
                         _ => {}
@@ -275,10 +271,8 @@ fn apply_event(
                     match rel {
                         "blocks" => task.blocks.retain(|x| x != target),
                         "blocked_by" => task.blocked_by.retain(|x| x != target),
-                        "parent" => {
-                            if task.parent.as_deref() == Some(target) {
-                                task.parent = None;
-                            }
+                        "parent" if task.parent.as_deref() == Some(target) => {
+                            task.parent = None;
                         }
                         _ => {}
                     }
