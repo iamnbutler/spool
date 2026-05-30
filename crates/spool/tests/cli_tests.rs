@@ -126,9 +126,10 @@ fn test_cli_parse_list_no_stream() {
 fn test_cli_parse_show() {
     let cli = Cli::parse_from(["spool", "show", "task-123"]);
 
-    if let Commands::Show { id, events } = cli.command {
+    if let Commands::Show { id, events, format } = cli.command {
         assert_eq!(id, "task-123");
         assert!(!events);
+        assert_eq!(format, "table");
     } else {
         panic!("Expected Show command");
     }
@@ -138,9 +139,23 @@ fn test_cli_parse_show() {
 fn test_cli_parse_show_with_events() {
     let cli = Cli::parse_from(["spool", "show", "task-456", "--events"]);
 
-    if let Commands::Show { id, events } = cli.command {
+    if let Commands::Show { id, events, format } = cli.command {
         assert_eq!(id, "task-456");
         assert!(events);
+        assert_eq!(format, "table");
+    } else {
+        panic!("Expected Show command");
+    }
+}
+
+#[test]
+fn test_cli_parse_show_json_format() {
+    let cli = Cli::parse_from(["spool", "show", "task-789", "--format", "json"]);
+
+    if let Commands::Show { id, events, format } = cli.command {
+        assert_eq!(id, "task-789");
+        assert!(!events);
+        assert_eq!(format, "json");
     } else {
         panic!("Expected Show command");
     }

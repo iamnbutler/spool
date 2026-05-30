@@ -59,9 +59,10 @@ fn main() -> Result<()> {
                 fmt,
             )
         }
-        Commands::Show { id, events } => {
+        Commands::Show { id, events, format } => {
             let ctx = SpoolContext::discover()?;
-            show_task(&ctx, &id, events)
+            let fmt = OutputFormat::from_str(&format);
+            show_task(&ctx, &id, events, fmt)
         }
         Commands::Rebuild => {
             let ctx = SpoolContext::discover()?;

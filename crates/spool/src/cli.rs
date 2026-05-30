@@ -78,6 +78,9 @@ pub enum Commands {
         /// Show raw event history
         #[arg(long)]
         events: bool,
+        /// Output format: table or json
+        #[arg(short, long, default_value = "table")]
+        format: String,
     },
     /// Rebuild .index.json and .state.json from events
     Rebuild,
@@ -315,13 +318,24 @@ pub fn list_tasks(
     Ok(())
 }
 
-pub fn show_task(ctx: &SpoolContext, id: &str, show_events: bool) -> Result<()> {
+pub fn show_task(
+    ctx: &SpoolContext,
+    id: &str,
+    show_events: bool,
+    format: OutputFormat,
+) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     let task = state
         .tasks
         .get(id)
         .ok_or_else(|| anyhow!("Task not found: {}", id))?;
+
+    if format == OutputFormat::Json {
+        let json = serde_json::to_string_pretty(task)?;
+        println!("{}", json);
+        return Ok(());
+    }
 
     println!("ID:       {}", task.id);
     println!("Title:    {}", task.title);
