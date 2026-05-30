@@ -215,6 +215,28 @@ fn test_show_with_events_flag() {
 }
 
 #[test]
+fn test_show_json_format() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task","priority":"p1","assignee":"@alice"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", "--format", "json", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":"))
+        .stdout(predicate::str::contains("\"title\":"))
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("Test task"))
+        .stdout(predicate::str::contains("\"priority\":"))
+        .stdout(predicate::str::contains("p1"));
+}
+
+#[test]
 fn test_complete_task() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);
