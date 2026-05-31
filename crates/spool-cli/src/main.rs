@@ -124,8 +124,9 @@ fn main() -> Result<()> {
                     let fmt = OutputFormat::from_str(&format);
                     list_streams(&ctx, fmt)
                 }
-                StreamCommands::Show { id, name } => {
-                    show_stream(&ctx, id.as_deref(), name.as_deref())
+                StreamCommands::Show { id, name, format } => {
+                    let fmt = OutputFormat::from_str(&format);
+                    show_stream(&ctx, id.as_deref(), name.as_deref(), fmt)
                 }
                 StreamCommands::Update {
                     id,

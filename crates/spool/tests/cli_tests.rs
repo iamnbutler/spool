@@ -595,9 +595,10 @@ fn test_cli_parse_stream_show() {
     let cli = Cli::parse_from(["spool", "stream", "show", "stream-123"]);
 
     if let Commands::Stream { command } = cli.command {
-        if let StreamCommands::Show { id, name } = command {
+        if let StreamCommands::Show { id, name, format } = command {
             assert_eq!(id.as_deref(), Some("stream-123"));
             assert!(name.is_none());
+            assert_eq!(format, "table");
         } else {
             panic!("Expected Stream Show command");
         }
@@ -611,9 +612,27 @@ fn test_cli_parse_stream_show_by_name() {
     let cli = Cli::parse_from(["spool", "stream", "show", "--name", "my-stream"]);
 
     if let Commands::Stream { command } = cli.command {
-        if let StreamCommands::Show { id, name } = command {
+        if let StreamCommands::Show { id, name, format } = command {
             assert!(id.is_none());
             assert_eq!(name.as_deref(), Some("my-stream"));
+            assert_eq!(format, "table");
+        } else {
+            panic!("Expected Stream Show command");
+        }
+    } else {
+        panic!("Expected Stream command");
+    }
+}
+
+#[test]
+fn test_cli_parse_stream_show_json_format() {
+    let cli = Cli::parse_from(["spool", "stream", "show", "--format", "json", "stream-123"]);
+
+    if let Commands::Stream { command } = cli.command {
+        if let StreamCommands::Show { id, name, format } = command {
+            assert_eq!(id.as_deref(), Some("stream-123"));
+            assert!(name.is_none());
+            assert_eq!(format, "json");
         } else {
             panic!("Expected Stream Show command");
         }
