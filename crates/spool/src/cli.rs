@@ -174,6 +174,9 @@ pub enum StreamCommands {
         /// Stream name (alternative to ID)
         #[arg(short, long)]
         name: Option<String>,
+        /// Output format: table or json
+        #[arg(short, long, default_value = "table")]
+        format: String,
     },
     /// Update stream metadata
     Update {
@@ -667,7 +670,12 @@ pub fn list_streams(ctx: &SpoolContext, format: OutputFormat) -> Result<()> {
 }
 
 /// Show details of a stream and its tasks
-pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> Result<()> {
+pub fn show_stream(
+    ctx: &SpoolContext,
+    id: Option<&str>,
+    name: Option<&str>,
+    format: OutputFormat,
+) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
 
     // Find stream by ID or name
@@ -685,13 +693,6 @@ pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> 
     };
     let stream_id = &stream.id;
 
-    println!("ID:          {}", stream.id);
-    println!("Name:        {}", stream.name);
-    if let Some(d) = &stream.description {
-        println!("Description: {}", d);
-    }
-    println!("Created:     {} by {}", stream.created, stream.created_by);
-
     // Find tasks in this stream
     let mut tasks: Vec<&Task> = state
         .tasks
@@ -699,6 +700,22 @@ pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> 
         .filter(|t| t.stream.as_deref() == Some(stream_id.as_str()))
         .collect();
     tasks.sort_by_key(|t| t.created);
+
+    if format == OutputFormat::Json {
+        let mut stream_json = serde_json::to_value(stream)?;
+        if let serde_json::Value::Object(ref mut map) = stream_json {
+            map.insert("tasks".to_string(), serde_json::to_value(&tasks)?);
+        }
+        println!("{}", serde_json::to_string_pretty(&stream_json)?);
+        return Ok(());
+    }
+
+    println!("ID:          {}", stream.id);
+    println!("Name:        {}", stream.name);
+    if let Some(d) = &stream.description {
+        println!("Description: {}", d);
+    }
+    println!("Created:     {} by {}", stream.created, stream.created_by);
 
     let open_count = tasks
         .iter()
