@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-30",
-  "last_run_id": "26671919769",
+  "last_run": "2026-05-31",
+  "last_run_id": "26701043895",
   "monthly_activity_issue": 84,
   "monthly_activity_month": "2026-05",
   "backlog_cursor": null,
@@ -41,7 +41,8 @@
     "surface-tui-reload-errors": "PR #89 (open, draft, clean — surface reload_tasks() errors via app.message at all 21 call sites, 260 tests pass)",
     "stats-command": "PR #90 (open, draft, clean — spool stats command: task count overview by status/stream/priority, 5 new integration tests, 265 tests pass)",
     "clippy-warnings-rust195": "PR #91 (open, draft, clean — fix 8 pre-existing clippy warnings now caught by Rust 1.95: collapsible_match in state.rs/main.rs + unnecessary_sort_by in app.rs; zero warnings, 260 tests pass, created 2026-05-28)",
-    "show-json-format": "PR #92 (open, draft, clean — add --format json to spool show; 2 new tests, 262 tests pass, created 2026-05-30)"
+    "show-json-format": "PR #92 (open, draft, clean — add --format json to spool show; 2 new tests, 262 tests pass, created 2026-05-30)",
+    "stream-show-json-format": "PR #93 (open, draft, clean — add --format json to spool stream show; JSON includes stream fields + tasks array; 1 new test, 261 tests pass, created 2026-05-31)"
   },
   "stale_pr_nudges": {
     "67": "2026-04-05",
@@ -54,8 +55,8 @@
     "71": ["help wanted"]
   },
   "pr_ci_status": {
-    "note": "31 open PRs total (27 Repo Assist + PR #62, 4 Maintainer). All PRs based on main SHA 5b7e3a2. Verified clean 2026-05-29. Maintainer PRs #68, #69, #72 fail cargo fmt --check (need manual fix). PR #67 passes clean. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
-    "checked": "2026-05-29",
+    "note": "32 open PRs total (28 Repo Assist + PR #62, 4 Maintainer). All PRs based on main SHA 5b7e3a2. Verified clean 2026-05-29. Maintainer PRs #68, #69, #72 fail cargo fmt --check (need manual fix). PR #67 passes clean. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
+    "checked": "2026-05-31",
     "maintainer_pr_ci": {
       "67": "pass:clean",
       "68": "cargo_fmt_needed:cannot_push:commented_2026-05-07",
@@ -63,7 +64,7 @@
       "72": "cargo_fmt_needed:cannot_push:commented_2026-05-07"
     }
   },
-  "open_repo_assist_prs": [54, 55, 56, 57, 58, 59, 60, 62, 63, 64, 66, 75, 76, 77, 78, 79, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 92],
+  "open_repo_assist_prs": [54, 55, 56, 57, 58, 59, 60, 62, 63, 64, 66, 75, 76, 77, 78, 79, 81, 82, 83, 85, 86, 87, 88, 89, 90, 91, 92, 93],
   "open_maintainer_prs": [67, 68, 69, 72],
   "codebase_findings": {
     "spool-ui-tests": "spool-ui crate has 79 unit tests inline in app.rs on current main (94 in PR #88 not yet merged). Tests cover StatusFilter/SortBy enum cycling, App navigation.",
@@ -78,29 +79,30 @@
     "stats-command-gap": "FIXED — PR #90 (2026-05-24) adds spool stats command: compact task count overview by status/stream/priority. 5 new integration tests, 265 tests total.",
     "clippy-warnings-rust195": "FIXED — PR #91 (2026-05-28) resolves 8 pre-existing clippy warnings now caught by Rust 1.95: 3x collapsible_match in state.rs (Link/Unlink handlers), 2x collapsible_match in main.rs (Tab/BackTab history handlers), 3x unnecessary_sort_by in app.rs. Zero warnings with -D warnings. 260 tests pass.",
     "show-json-format-gap": "FIXED — PR #92 (2026-05-30) adds --format json to spool show command. 2 new tests (unit + integration), 262 tests pass. JSON output = full Task struct, consistent with spool list --format json.",
+    "stream-show-json-gap": "FIXED — PR #93 (2026-05-31) adds --format json to spool stream show. JSON output = Stream struct fields + tasks array. 1 new CLI parse test, 261 tests pass. Completes JSON coverage across all 4 read commands.",
     "release-pr55-branch": "PR #55 head commit a9d0fa4 on branch repo-assist/release-v1.2.1-74e2acfcd3cf1599 — CHANGELOG correct, includes #53 fix.",
     "pre-existing-clippy-warnings": "RESOLVED via PR #91 — 3 collapsible_match in state.rs + 2 in main.rs + 3 unnecessary_sort_by in app.rs. All fixed 2026-05-28.",
     "shell-completion-gap": "spool has no shell completion support (no clap_complete dependency). Filing an issue requires new dependency discussion first per AGENTS.md. Defer until PR backlog reduces.",
     "no-quiet-or-color-flags": "spool CLI has no --quiet or --no-color global flags. Per-command -f flag exists for output format control.",
     "assign-task-writer-test-gap": "assign_task() in writer.rs has no direct test in writer_tests.rs. State materialization is tested via state_tests.rs. Low priority gap given coverage elsewhere.",
     "parent-link-gap": "link/unlink events for 'parent' relationship: event model defined, state materialisation complete and tested, but NO writer API (no link_tasks() function) and NO CLI subcommand. PR #62 covers blocks/blocked_by only. parent relationship cannot be created through public API. Defer implementation until backlog reduces.",
-    "stream-show-json-gap": "spool stream show has no --format json option. Future candidate after PR backlog reduces."
+    "json-output-complete": "All 4 read commands now have --format json: spool list (existing), spool stream list (existing), spool show (PR #92), spool stream show (PR #93). JSON output coverage is complete."
   },
   "task_last_run": {
-    "task1_triage": "2026-05-29",
-    "task2_fix_issues": "2026-05-27",
-    "task3_improvements": "2026-05-28",
+    "task1_triage": "2026-05-31",
+    "task2_fix_issues": "2026-05-31",
+    "task3_improvements": "2026-05-31",
     "task4_deps": "2026-05-28",
-    "task5_maintain_prs": "2026-05-29",
+    "task5_maintain_prs": "2026-05-31",
     "task6_stale_nudges": "2026-05-30",
-    "task7_labels": "2026-05-29",
+    "task7_labels": "2026-05-31",
     "task8_release": "2026-05-30",
     "task9_welcome": "2026-05-30",
     "task10_forward": "2026-05-30",
-    "task11_monthly_summary": "2026-05-30"
+    "task11_monthly_summary": "2026-05-31"
   },
   "deps_last_checked": "2026-05-28",
   "deps_pr": 60,
   "deps_pr_branch": "repo-assist/deps-update-2026-03-05-7ddf94a021c0519c",
-  "notes": "May 2026. Run 2026-05-30: Tasks 6/8/9/10/11. Task 10: Created PR #92 (spool show --format json, 2 new tests, 262 total pass). Task 8: PR #55 branch already contains CHANGELOG update mentioning #53 fix — no action needed. Tasks 6/9: nothing to do (no stale human PRs, no new contributors). 31 open PRs total. Deps next check ~2026-06-04. Do NOT try push_to_pull_request_branch on PRs #68/#69/#72 ever again. Next round-robin priority: task1_triage (2026-05-29), task2_fix_issues (2026-05-27), task3_improvements (2026-05-28), task4_deps (2026-05-28), task5_maintain_prs (2026-05-29), task7_labels (2026-05-29)."
+  "notes": "May 2026. Run 2026-05-31: Tasks 1/2/3/5/7/11. Task 3: Created PR #93 (spool stream show --format json, JSON includes Stream fields + tasks array, 1 new test, 261 tests pass). Tasks 1/2/5/7: All 9 issues have RA comments, no new human activity; all 32 PRs on main SHA 5b7e3a2 with clean mergeable_state. JSON output now complete across all 4 read commands. 32 open PRs total. Deps next check ~2026-06-04. Do NOT try push_to_pull_request_branch on PRs #68/#69/#72 ever again. Next round-robin priority: task4_deps (2026-05-28, but skip until 2026-06-04), task6_stale_nudges (2026-05-30), task8_release (2026-05-30), task9_welcome (2026-05-30), task10_forward (2026-05-30)."
 }
