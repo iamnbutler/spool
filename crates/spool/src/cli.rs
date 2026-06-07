@@ -679,7 +679,7 @@ pub fn show_stream(ctx: &SpoolContext, id: Option<&str>, name: Option<&str>) -> 
         (None, Some(name)) => state
             .streams
             .values()
-            .find(|s| s.name == name)
+            .find(|s| s.name.eq_ignore_ascii_case(name))
             .ok_or_else(|| anyhow!("Stream not found with name: {}", name))?,
         (None, None) => return Err(anyhow!("Either stream ID or --name must be provided")),
     };

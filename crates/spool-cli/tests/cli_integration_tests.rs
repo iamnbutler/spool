@@ -707,6 +707,34 @@ fn test_stream_show_by_name() {
 }
 
 #[test]
+fn test_stream_show_by_name_case_insensitive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "Backend", "--description", "Backend work"])
+        .assert()
+        .success();
+
+    // Lookup with different casing should work the same as list --stream-name
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", "--name", "backend"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Backend"))
+        .stdout(predicate::str::contains("Backend work"));
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", "--name", "BACKEND"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Backend"));
+}
+
+#[test]
 fn test_stream_show_not_found() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);
