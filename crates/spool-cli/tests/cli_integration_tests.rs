@@ -604,6 +604,47 @@ fn test_list_filter_by_assignee() {
 }
 
 #[test]
+fn test_list_filter_by_assignee_case_insensitive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Assigned task","assignee":"@Alice"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Other task"}}"#,
+        ),
+    );
+
+    // Exact match still works
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@Alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // Case-insensitive match: @alice matches @Alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // Case-insensitive match: @ALICE matches @Alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@ALICE"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+}
+
+#[test]
 fn test_list_filter_by_priority() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);

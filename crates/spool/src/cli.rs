@@ -249,9 +249,14 @@ pub fn list_tasks(
                 _ => true,
             };
 
-            // Assignee filter
+            // Assignee filter (case-insensitive, consistent with --stream-name)
             let assignee_match = assignee
-                .map(|a| t.assignee.as_deref() == Some(a))
+                .map(|a| {
+                    t.assignee
+                        .as_deref()
+                        .map(|ta| ta.eq_ignore_ascii_case(a))
+                        .unwrap_or(false)
+                })
                 .unwrap_or(true);
 
             // Tag filter
