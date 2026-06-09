@@ -647,6 +647,29 @@ fn test_list_filter_by_tag() {
         .stdout(predicate::str::contains("task-002").not());
 }
 
+#[test]
+fn test_list_filter_by_tag_case_insensitive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Tagged task","tags":["Rust"]}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Untagged task"}}"#,
+        ),
+    );
+
+    // Stored as "Rust", filter with lowercase "rust" — should still match
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--tag", "rust"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+}
+
 // ==========================================
 // Stream command tests
 // ==========================================
