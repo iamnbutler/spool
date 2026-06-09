@@ -255,7 +255,9 @@ pub fn list_tasks(
                 .unwrap_or(true);
 
             // Tag filter
-            let tag_match = tag.map(|tg| t.tags.iter().any(|t| t == tg)).unwrap_or(true);
+            let tag_match = tag
+                .map(|tg| t.tags.iter().any(|t| t.eq_ignore_ascii_case(tg)))
+                .unwrap_or(true);
 
             // Priority filter
             let priority_match = priority
