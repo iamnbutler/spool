@@ -30,6 +30,7 @@ fn test_cli_parse_list_defaults() {
         stream,
         stream_name,
         no_stream,
+        search,
         format,
     } = cli.command
     {
@@ -40,7 +41,30 @@ fn test_cli_parse_list_defaults() {
         assert!(stream.is_none());
         assert!(stream_name.is_none());
         assert!(!no_stream);
+        assert!(search.is_none());
         assert_eq!(format, "table");
+    } else {
+        panic!("Expected List command");
+    }
+}
+
+#[test]
+fn test_cli_parse_list_search() {
+    let cli = Cli::parse_from(["spool", "list", "--search", "authentication"]);
+
+    if let Commands::List { search, .. } = cli.command {
+        assert_eq!(search.as_deref(), Some("authentication"));
+    } else {
+        panic!("Expected List command");
+    }
+}
+
+#[test]
+fn test_cli_parse_list_search_short_flag() {
+    let cli = Cli::parse_from(["spool", "list", "-q", "bug fix"]);
+
+    if let Commands::List { search, .. } = cli.command {
+        assert_eq!(search.as_deref(), Some("bug fix"));
     } else {
         panic!("Expected List command");
     }
