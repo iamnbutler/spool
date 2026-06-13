@@ -257,9 +257,14 @@ pub fn list_tasks(
             // Tag filter
             let tag_match = tag.map(|tg| t.tags.iter().any(|t| t == tg)).unwrap_or(true);
 
-            // Priority filter
+            // Priority filter (case-insensitive, consistent with --stream-name)
             let priority_match = priority
-                .map(|p| t.priority.as_deref() == Some(p))
+                .map(|p| {
+                    t.priority
+                        .as_deref()
+                        .map(|tp| tp.eq_ignore_ascii_case(p))
+                        .unwrap_or(false)
+                })
                 .unwrap_or(true);
 
             // Stream filter (--stream, --stream-name, and --no-stream are mutually exclusive)
