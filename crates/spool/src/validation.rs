@@ -37,7 +37,12 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
         )?;
     }
 
-    // Validate archive files
+    // Validate archive files using a separate ID set.  archive_tasks() copies
+    // the full event history for each task (including its create event) into
+    // archive/ without removing the originals from events/.  Using the same
+    // created_ids set for both directories would produce a false "Duplicate
+    // create" warning for every archived task.
+    let mut archive_created_ids: HashSet<String> = HashSet::new();
     for file in ctx.get_archive_files()? {
         let filename = file
             .file_name()
@@ -51,7 +56,7 @@ pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
             &filename,
             &mut errors,
             &mut warnings,
-            &mut created_ids,
+            &mut archive_created_ids,
         )?;
     }
 

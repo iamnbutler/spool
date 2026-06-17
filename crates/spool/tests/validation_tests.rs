@@ -322,3 +322,53 @@ fn test_validation_archive_files() {
     assert!(result.errors.is_empty());
     assert!(result.warnings.is_empty());
 }
+
+#[test]
+fn test_validation_no_false_duplicate_after_archive() {
+    // archive_tasks() copies the full event history of each task into
+    // archive/ without removing the originals from events/.  Validation
+    // must not produce "Duplicate create" warnings in this scenario.
+    let temp_dir = TempDir::new().unwrap();
+    let spool_dir = setup_spool_dir(&temp_dir);
+
+    let create_event = json!({
+        "v": 1, "op": "create", "id": "task-archived",
+        "ts": "2023-12-01T10:00:00Z", "by": "tester", "branch": "main",
+        "d": {"title": "Task to be archived"}
+    });
+    let complete_event = json!({
+        "v": 1, "op": "complete", "id": "task-archived",
+        "ts": "2023-12-01T11:00:00Z", "by": "tester", "branch": "main",
+        "d": {"resolution": "done"}
+    });
+
+    // Original events still present in events/ (not deleted by archive_tasks)
+    write_events(
+        &spool_dir.join("events"),
+        "2023-12-01.jsonl",
+        &[create_event.clone(), complete_event.clone()],
+    );
+
+    // Full event history also copied to archive/
+    write_events(
+        &spool_dir.join("archive"),
+        "2023-12.jsonl",
+        &[create_event, complete_event],
+    );
+
+    let ctx = create_test_context(&spool_dir);
+    let result = spool::validation::validate(&ctx, false).unwrap();
+
+    // Must not warn about duplicate creates across the events/archive boundary
+    let dup_warnings: Vec<_> = result
+        .warnings
+        .iter()
+        .filter(|w| w.contains("Duplicate create"))
+        .collect();
+    assert!(
+        dup_warnings.is_empty(),
+        "Unexpected duplicate-create warnings: {:?}",
+        dup_warnings
+    );
+    assert!(result.errors.is_empty());
+}
