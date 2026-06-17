@@ -945,3 +945,46 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+#[test]
+fn test_list_status_filter_case_insensitive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Completed task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-002","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    // Uppercase --status OPEN should show only open tasks (not all)
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "OPEN"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // Mixed-case --status Complete should show only completed tasks
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "Complete"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001").not())
+        .stdout(predicate::str::contains("task-002"));
+
+    // Uppercase --status ALL should show both tasks
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "ALL"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002"));
+}
