@@ -33,6 +33,11 @@ pub fn write_event(ctx: &SpoolContext, event: &Event) -> Result<()> {
     writeln!(writer, "{}", json)?;
     writer.flush()?;
 
+    // Invalidate the materialised state cache so subsequent reads reflect
+    // this event.  If `spool rebuild` has never been run the file won't
+    // exist, which is fine — we ignore the error.
+    let _ = std::fs::remove_file(ctx.state_path());
+
     Ok(())
 }
 
