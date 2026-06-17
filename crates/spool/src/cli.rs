@@ -237,12 +237,15 @@ pub fn list_tasks(
     // Use stream ID directly, or resolved from name
     let effective_stream = stream.map(String::from).or(stream_id_from_name);
 
+    // Normalise status filter to lowercase so "OPEN", "Open", etc. all work.
+    let status_lower: Option<String> = status_filter.map(|s| s.to_ascii_lowercase());
+
     let mut tasks: Vec<&Task> = state
         .tasks
         .values()
         .filter(|t| {
             // Status filter
-            let status_match = match status_filter {
+            let status_match = match status_lower.as_deref() {
                 Some("open") => t.status == TaskStatus::Open,
                 Some("complete") => t.status == TaskStatus::Complete,
                 Some("all") | None => true,
