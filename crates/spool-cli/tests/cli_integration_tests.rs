@@ -945,3 +945,120 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+#[test]
+fn test_update_task_rejects_empty_title() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Valid Task"])
+        .assert()
+        .success();
+
+    // Get the task ID
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let task_id = String::from_utf8(output).unwrap().trim().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["update", &task_id, "--title", ""])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be empty"));
+}
+
+#[test]
+fn test_update_task_rejects_whitespace_title() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Valid Task"])
+        .assert()
+        .success();
+
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let task_id = String::from_utf8(output).unwrap().trim().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["update", &task_id, "--title", "   "])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be empty"));
+}
+
+#[test]
+fn test_update_stream_rejects_empty_name() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "My Stream"])
+        .assert()
+        .success();
+
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stream_id = String::from_utf8(output).unwrap().trim().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "update", &stream_id, "--name", ""])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be empty"));
+}
+
+#[test]
+fn test_update_stream_rejects_whitespace_name() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "My Stream"])
+        .assert()
+        .success();
+
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stream_id = String::from_utf8(output).unwrap().trim().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "update", &stream_id, "--name", "   "])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be empty"));
+}
