@@ -448,6 +448,13 @@ pub fn update_task(
     priority: Option<&str>,
     stream: Option<&str>,
 ) -> Result<()> {
+    // Validate title is non-empty if provided
+    if let Some(t) = title {
+        if t.trim().is_empty() {
+            return Err(anyhow!("Task title cannot be empty or whitespace-only"));
+        }
+    }
+
     let state = load_or_materialize_state(ctx)?;
 
     // Verify task exists
@@ -735,6 +742,13 @@ pub fn update_stream_cmd(
     name: Option<&str>,
     description: Option<&str>,
 ) -> Result<()> {
+    // Validate name is non-empty if provided
+    if let Some(n) = name {
+        if n.trim().is_empty() {
+            return Err(anyhow!("Stream name cannot be empty or whitespace-only"));
+        }
+    }
+
     let state = load_or_materialize_state(ctx)?;
 
     // Verify stream exists
