@@ -681,7 +681,7 @@ fn draw_history_list(f: &mut Frame, area: Rect, app: &mut App) {
 // Lines are built conditionally based on event type (task vs stream) and optional fields,
 // so initializing with vec![] and pushing is clearer than a complex vec![...] literal.
 #[allow(clippy::vec_init_then_push)]
-fn draw_history_detail(f: &mut Frame, area: Rect, app: &App) {
+fn draw_history_detail(f: &mut Frame, area: Rect, app: &mut App) {
     let content = if let Some(event) = app.selected_history_event() {
         let mut lines = vec![];
 
@@ -853,6 +853,9 @@ fn draw_history_detail(f: &mut Frame, area: Rect, app: &App) {
         vec![Line::from("No event selected")]
     };
 
+    let content_height = content.len() as u16;
+    let visible_height = area.height.saturating_sub(2);
+
     let detail = Paragraph::new(content)
         .block(
             Block::default()
@@ -864,6 +867,10 @@ fn draw_history_detail(f: &mut Frame, area: Rect, app: &App) {
         .scroll((app.history_detail_scroll, 0));
 
     f.render_widget(detail, area);
+
+    // Set after content is consumed
+    app.history_detail_content_height = content_height;
+    app.history_detail_visible_height = visible_height;
 }
 
 /// Truncates string to max length, adding `~` if truncated.
