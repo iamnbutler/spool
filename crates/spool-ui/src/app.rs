@@ -162,6 +162,8 @@ pub struct App {
     pub history_scroll_x: u16,
     pub history_show_detail: bool,
     pub history_detail_scroll: u16,
+    pub history_detail_content_height: u16, // set by UI during render
+    pub history_detail_visible_height: u16, // set by UI during render
     pub all_tasks: std::collections::HashMap<String, Task>, // for name lookups
     ctx: SpoolContext,
 }
@@ -239,6 +241,8 @@ impl App {
             history_scroll_x: 0,
             history_show_detail: false,
             history_detail_scroll: 0,
+            history_detail_content_height: 0,
+            history_detail_visible_height: 0,
             all_tasks,
             ctx,
         })
@@ -1058,12 +1062,14 @@ impl App {
         if !self.history_events.is_empty() {
             self.history_selected = (self.history_selected + 1).min(self.history_events.len() - 1);
             self.history_list_state.select(Some(self.history_selected));
+            self.history_detail_scroll = 0;
         }
     }
 
     pub fn history_previous(&mut self) {
         self.history_selected = self.history_selected.saturating_sub(1);
         self.history_list_state.select(Some(self.history_selected));
+        self.history_detail_scroll = 0;
     }
 
     pub fn history_first(&mut self) {
@@ -1105,7 +1111,12 @@ impl App {
     }
 
     pub fn history_detail_scroll_down(&mut self) {
-        self.history_detail_scroll = self.history_detail_scroll.saturating_add(1);
+        let max_scroll = self
+            .history_detail_content_height
+            .saturating_sub(self.history_detail_visible_height);
+        if self.history_detail_scroll < max_scroll {
+            self.history_detail_scroll = self.history_detail_scroll.saturating_add(1);
+        }
     }
 
     pub fn history_detail_scroll_up(&mut self) {
@@ -1170,6 +1181,8 @@ impl App {
             history_scroll_x: 0,
             history_show_detail: false,
             history_detail_scroll: 0,
+            history_detail_content_height: 0,
+            history_detail_visible_height: 0,
             all_tasks: tasks_map,
             ctx: SpoolContext::new(PathBuf::from("/nonexistent")),
         }
@@ -1924,13 +1937,35 @@ mod tests {
     }
 
     #[test]
-    fn test_history_detail_scroll_down_increments() {
+    fn test_history_detail_scroll_down_increments_within_bounds() {
         let mut app = App::new_for_test(vec![]);
+        app.history_detail_content_height = 20;
+        app.history_detail_visible_height = 10;
         assert_eq!(app.history_detail_scroll, 0);
         app.history_detail_scroll_down();
         assert_eq!(app.history_detail_scroll, 1);
         app.history_detail_scroll_down();
         assert_eq!(app.history_detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_history_detail_scroll_down_clamps_at_max() {
+        let mut app = App::new_for_test(vec![]);
+        app.history_detail_content_height = 12;
+        app.history_detail_visible_height = 10;
+        app.history_detail_scroll = 2; // already at max (12 - 10 = 2)
+        app.history_detail_scroll_down();
+        assert_eq!(app.history_detail_scroll, 2);
+    }
+
+    #[test]
+    fn test_history_detail_scroll_down_noop_when_content_fits() {
+        // When content fits in the visible area, scrolling down should do nothing
+        let mut app = App::new_for_test(vec![]);
+        app.history_detail_content_height = 5;
+        app.history_detail_visible_height = 10;
+        app.history_detail_scroll_down();
+        assert_eq!(app.history_detail_scroll, 0);
     }
 
     #[test]
@@ -1945,6 +1980,24 @@ mod tests {
     fn test_history_detail_scroll_up_clamps_at_zero() {
         let mut app = App::new_for_test(vec![]);
         app.history_detail_scroll_up();
+        assert_eq!(app.history_detail_scroll, 0);
+    }
+
+    #[test]
+    fn test_history_next_resets_detail_scroll() {
+        let mut app = app_with_history(3);
+        app.history_detail_scroll = 5;
+        app.history_next();
+        assert_eq!(app.history_detail_scroll, 0);
+    }
+
+    #[test]
+    fn test_history_previous_resets_detail_scroll() {
+        let mut app = app_with_history(3);
+        app.history_selected = 2;
+        app.history_list_state.select(Some(2));
+        app.history_detail_scroll = 5;
+        app.history_previous();
         assert_eq!(app.history_detail_scroll, 0);
     }
 
