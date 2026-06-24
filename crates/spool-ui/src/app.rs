@@ -584,7 +584,17 @@ impl App {
                     let priority = if self.input_buffer.trim().is_empty() {
                         None
                     } else {
-                        Some(self.input_buffer.trim())
+                        let p = self.input_buffer.trim();
+                        if !matches!(p, "p0" | "p1" | "p2" | "p3") {
+                            self.message = Some(format!(
+                                "Invalid priority '{}'. Must be one of: p0, p1, p2, p3",
+                                p
+                            ));
+                            self.input_mode = InputMode::Normal;
+                            self.input_buffer.clear();
+                            return;
+                        }
+                        Some(p)
                     };
                     writer::update_task(&self.ctx, &task_id, None, None, priority, &by, &branch)
                 }
@@ -1781,6 +1791,53 @@ mod tests {
         assert!(app.editing_task_id.is_none());
         assert!(app.editing_stream_id.is_none());
         assert_eq!(app.edit_field_selected, 0);
+    }
+
+    // --- Priority edit validation ---
+
+    #[test]
+    fn test_submit_task_edit_invalid_priority_shows_error() {
+        let tasks = vec![make_task("t1", "Task One")];
+        let mut app = App::new_for_test(tasks);
+        app.editing_task_id = Some("t1".to_string());
+        app.input_mode = InputMode::EditTaskPriority;
+        app.input_buffer = "urgent".to_string();
+        app.submit_task_edit();
+        assert!(
+            app.message
+                .as_deref()
+                .unwrap_or("")
+                .contains("Invalid priority"),
+            "expected invalid priority message, got: {:?}",
+            app.message
+        );
+        assert_eq!(app.input_mode, InputMode::Normal);
+        assert!(app.input_buffer.is_empty());
+    }
+
+    #[test]
+    fn test_submit_task_edit_invalid_priority_variations() {
+        for bad in &["high", "low", "P0", "P1", "critical", "1", ""] {
+            // empty string is accepted (clears priority), so skip it
+            if bad.is_empty() {
+                continue;
+            }
+            let tasks = vec![make_task("t1", "Task One")];
+            let mut app = App::new_for_test(tasks);
+            app.editing_task_id = Some("t1".to_string());
+            app.input_mode = InputMode::EditTaskPriority;
+            app.input_buffer = bad.to_string();
+            app.submit_task_edit();
+            assert!(
+                app.message
+                    .as_deref()
+                    .unwrap_or("")
+                    .contains("Invalid priority"),
+                "expected invalid priority message for '{}', got: {:?}",
+                bad,
+                app.message
+            );
+        }
     }
 
     // --- History navigation ---
