@@ -249,6 +249,22 @@ impl App {
         &self.ctx.events_dir
     }
 
+    /// Returns true if the task matches the given search query (case-insensitive).
+    /// Searches title, description, tags, and assignee.
+    fn task_matches_query(t: &Task, query: &str) -> bool {
+        let q = query.to_lowercase();
+        t.title.to_lowercase().contains(&q)
+            || t.description
+                .as_ref()
+                .map(|d| d.to_lowercase().contains(&q))
+                .unwrap_or(false)
+            || t.tags.iter().any(|tag| tag.to_lowercase().contains(&q))
+            || t.assignee
+                .as_ref()
+                .map(|a| a.to_lowercase().contains(&q))
+                .unwrap_or(false)
+    }
+
     pub fn reload_tasks(&mut self) -> Result<()> {
         let state = load_or_materialize_state(&self.ctx)?;
         self.streams = state.streams.clone();
@@ -283,18 +299,7 @@ impl App {
                 None => true,
                 Some(stream_id) => t.stream.as_ref() == Some(stream_id),
             })
-            .filter(|t| {
-                if query.is_empty() {
-                    true
-                } else {
-                    t.title.to_lowercase().contains(&query)
-                        || t.description
-                            .as_ref()
-                            .map(|d| d.to_lowercase().contains(&query))
-                            .unwrap_or(false)
-                        || t.tags.iter().any(|tag| tag.to_lowercase().contains(&query))
-                }
-            })
+            .filter(|t| query.is_empty() || App::task_matches_query(t, &query))
             .collect();
 
         self.sort_tasks(&mut tasks);
@@ -1623,6 +1628,32 @@ mod tests {
         app.search_query = "something".to_string();
         app.clear_search();
         assert_eq!(app.search_query, "");
+    }
+
+    // --- task_matches_query ---
+
+    #[test]
+    fn test_task_matches_query_by_title() {
+        let task = make_task("t1", "Fix authentication bug");
+        assert!(App::task_matches_query(&task, "auth"));
+        assert!(App::task_matches_query(&task, "AUTH")); // case-insensitive
+        assert!(!App::task_matches_query(&task, "deploy"));
+    }
+
+    #[test]
+    fn test_task_matches_query_by_assignee() {
+        let mut task = make_task("t2", "Review PR");
+        task.assignee = Some("@alice".to_string());
+        assert!(App::task_matches_query(&task, "@alice"));
+        assert!(App::task_matches_query(&task, "alice")); // partial match
+        assert!(App::task_matches_query(&task, "ALICE")); // case-insensitive
+        assert!(!App::task_matches_query(&task, "@bob")); // different assignee
+    }
+
+    #[test]
+    fn test_task_matches_query_no_assignee_does_not_match_assignee_query() {
+        let task = make_task("t3", "Unassigned task");
+        assert!(!App::task_matches_query(&task, "@alice"));
     }
 
     // --- Status filter and sort cycling via App methods ---
