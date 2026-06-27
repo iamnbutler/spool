@@ -67,6 +67,9 @@ pub enum Commands {
         /// Show only tasks without a stream
         #[arg(long, conflicts_with_all = ["stream", "stream_name"])]
         no_stream: bool,
+        /// Search by title, description, or tags (case-insensitive substring)
+        #[arg(long)]
+        search: Option<String>,
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table")]
         format: String,
@@ -221,6 +224,7 @@ pub fn list_tasks(
     stream: Option<&str>,
     stream_name: Option<&str>,
     no_stream: bool,
+    search: Option<&str>,
     format: OutputFormat,
 ) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
@@ -272,7 +276,20 @@ pub fn list_tasks(
                     .unwrap_or(true)
             };
 
-            status_match && assignee_match && tag_match && priority_match && stream_match
+            // Search filter: case-insensitive substring across title, description, and tags
+            let search_match = search
+                .map(|q| {
+                    let q_lower = q.to_lowercase();
+                    t.title.to_lowercase().contains(&q_lower)
+                        || t.description
+                            .as_deref()
+                            .map(|d| d.to_lowercase().contains(&q_lower))
+                            .unwrap_or(false)
+                        || t.tags.iter().any(|tag| tag.to_lowercase().contains(&q_lower))
+                })
+                .unwrap_or(true);
+
+            status_match && assignee_match && tag_match && priority_match && stream_match && search_match
         })
         .collect();
 
