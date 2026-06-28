@@ -67,6 +67,9 @@ pub enum Commands {
         /// Show only tasks without a stream
         #[arg(long, conflicts_with_all = ["stream", "stream_name"])]
         no_stream: bool,
+        /// Limit output to N tasks
+        #[arg(short = 'n', long)]
+        limit: Option<usize>,
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table")]
         format: String,
@@ -221,6 +224,7 @@ pub fn list_tasks(
     stream: Option<&str>,
     stream_name: Option<&str>,
     no_stream: bool,
+    limit: Option<usize>,
     format: OutputFormat,
 ) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
@@ -278,6 +282,11 @@ pub fn list_tasks(
 
     // Sort by created date
     tasks.sort_by_key(|t| t.created);
+
+    // Apply limit after sorting
+    if let Some(n) = limit {
+        tasks.truncate(n);
+    }
 
     match format {
         OutputFormat::Json => {

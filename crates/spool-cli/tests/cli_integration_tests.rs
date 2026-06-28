@@ -945,3 +945,86 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+#[test]
+fn test_list_limit_truncates_results() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Add 3 tasks
+    for title in &["Alpha task", "Beta task", "Gamma task"] {
+        spool_cmd()
+            .current_dir(temp_dir.path())
+            .args(["add", title])
+            .assert()
+            .success();
+    }
+
+    // Without limit: all 3 tasks shown
+    let output_all = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .output()
+        .unwrap();
+    let ids_all: Vec<&str> = std::str::from_utf8(&output_all.stdout)
+        .unwrap()
+        .lines()
+        .collect();
+    assert_eq!(ids_all.len(), 3);
+
+    // With --limit 2: only 2 tasks shown
+    let output_limited = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids", "--limit", "2"])
+        .output()
+        .unwrap();
+    let ids_limited: Vec<&str> = std::str::from_utf8(&output_limited.stdout)
+        .unwrap()
+        .lines()
+        .collect();
+    assert_eq!(ids_limited.len(), 2);
+}
+
+#[test]
+fn test_list_limit_larger_than_results() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Only task"])
+        .assert()
+        .success();
+
+    // --limit 10 when there is only 1 task: still returns 1
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids", "--limit", "10"])
+        .output()
+        .unwrap();
+    let ids: Vec<&str> = std::str::from_utf8(&output.stdout)
+        .unwrap()
+        .lines()
+        .collect();
+    assert_eq!(ids.len(), 1);
+}
+
+#[test]
+fn test_list_limit_zero_returns_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Some task"])
+        .assert()
+        .success();
+
+    // --limit 0: no tasks returned
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids", "--limit", "0"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}

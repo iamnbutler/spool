@@ -30,6 +30,7 @@ fn test_cli_parse_list_defaults() {
         stream,
         stream_name,
         no_stream,
+        limit,
         format,
     } = cli.command
     {
@@ -40,6 +41,7 @@ fn test_cli_parse_list_defaults() {
         assert!(stream.is_none());
         assert!(stream_name.is_none());
         assert!(!no_stream);
+        assert!(limit.is_none());
         assert_eq!(format, "table");
     } else {
         panic!("Expected List command");
@@ -687,5 +689,27 @@ fn test_cli_parse_stream_delete() {
         }
     } else {
         panic!("Expected Stream command");
+    }
+}
+
+#[test]
+fn test_cli_parse_list_limit() {
+    let cli = Cli::parse_from(["spool", "list", "--limit", "5"]);
+
+    if let Commands::List { limit, .. } = cli.command {
+        assert_eq!(limit, Some(5));
+    } else {
+        panic!("Expected List command");
+    }
+}
+
+#[test]
+fn test_cli_parse_list_limit_short_flag() {
+    let cli = Cli::parse_from(["spool", "list", "-n", "10"]);
+
+    if let Commands::List { limit, .. } = cli.command {
+        assert_eq!(limit, Some(10));
+    } else {
+        panic!("Expected List command");
     }
 }

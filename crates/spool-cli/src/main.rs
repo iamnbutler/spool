@@ -43,6 +43,7 @@ fn main() -> Result<()> {
             stream,
             stream_name,
             no_stream,
+            limit,
             format,
         } => {
             let ctx = SpoolContext::discover()?;
@@ -56,6 +57,7 @@ fn main() -> Result<()> {
                 stream.as_deref(),
                 stream_name.as_deref(),
                 no_stream,
+                limit,
                 fmt,
             )
         }
