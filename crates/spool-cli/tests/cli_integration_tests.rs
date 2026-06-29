@@ -945,3 +945,37 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+#[test]
+fn test_list_status_all_shows_status_column() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Done task","priority":"p2"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-002","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    // --status all should include STATUS column in header
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "all"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("STATUS"))
+        .stdout(predicate::str::contains("open"))
+        .stdout(predicate::str::contains("done"));
+
+    // Default (--status open) should NOT include STATUS column
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("STATUS").not());
+}

@@ -295,7 +295,17 @@ pub fn list_tasks(
                 return Ok(());
             }
 
-            println!("{:<15} {:<10} {:<12} TITLE", "ID", "PRIORITY", "ASSIGNEE");
+            // Show a STATUS column only when mixed statuses can appear (--status all)
+            let show_status = matches!(status_filter, Some("all"));
+
+            if show_status {
+                println!(
+                    "{:<15} {:<8} {:<10} {:<12} TITLE",
+                    "ID", "STATUS", "PRIORITY", "ASSIGNEE"
+                );
+            } else {
+                println!("{:<15} {:<10} {:<12} TITLE", "ID", "PRIORITY", "ASSIGNEE");
+            }
             for task in &tasks {
                 let priority = task.priority.as_deref().unwrap_or("-");
                 let assignee = task.assignee.as_deref().unwrap_or("-");
@@ -304,10 +314,21 @@ pub fn list_tasks(
                 } else {
                     task.title.clone()
                 };
-                println!(
-                    "{:<15} {:<10} {:<12} {}",
-                    task.id, priority, assignee, title
-                );
+                if show_status {
+                    let status = match task.status {
+                        TaskStatus::Open => "open",
+                        TaskStatus::Complete => "done",
+                    };
+                    println!(
+                        "{:<15} {:<8} {:<10} {:<12} {}",
+                        task.id, status, priority, assignee, title
+                    );
+                } else {
+                    println!(
+                        "{:<15} {:<10} {:<12} {}",
+                        task.id, priority, assignee, title
+                    );
+                }
             }
         }
     }
