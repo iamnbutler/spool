@@ -95,6 +95,16 @@ pub fn get_current_branch() -> Result<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = stderr.trim();
+        if stderr.is_empty() {
+            eprintln!("warning: could not detect current git branch; recording as \"main\"");
+        } else {
+            eprintln!(
+                "warning: could not detect current git branch ({}); recording as \"main\"",
+                stderr
+            );
+        }
         Ok("main".to_string())
     }
 }
