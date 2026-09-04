@@ -177,7 +177,7 @@ fn test_parse_events_from_file_skips_empty_lines() {
     let event_file = spool_dir.join("events").join("2024-01-15.jsonl");
     let mut file = fs::File::create(&event_file).unwrap();
     writeln!(file, r#"{{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{{"title":"First"}}}}"#).unwrap();
-    writeln!(file, "").unwrap(); // Empty line
+    writeln!(file).unwrap(); // Empty line
     writeln!(file, "   ").unwrap(); // Whitespace line
     writeln!(file, r#"{{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{{"title":"Second"}}}}"#).unwrap();
 

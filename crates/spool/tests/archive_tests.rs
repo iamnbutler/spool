@@ -115,7 +115,7 @@ fn test_archive_old_completed_archived() {
     let archive_files: Vec<_> = fs::read_dir(spool_dir.join("archive"))
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
         .collect();
     assert!(!archive_files.is_empty());
 }
@@ -156,7 +156,7 @@ fn test_archive_dry_run() {
     let archive_files: Vec<_> = fs::read_dir(spool_dir.join("archive"))
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
         .collect();
     assert!(archive_files.is_empty());
 }
