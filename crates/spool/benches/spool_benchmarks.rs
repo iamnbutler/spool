@@ -23,6 +23,7 @@ fn create_test_spool(num_tasks: usize) -> (TempDir, SpoolContext) {
     let event_file = ctx.events_dir.join("2026-01-01.jsonl");
     let file = OpenOptions::new()
         .create(true)
+        .truncate(true)
         .write(true)
         .open(&event_file)
         .unwrap();
