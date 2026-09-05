@@ -1,11 +1,11 @@
 {
-  "last_run": "2026-09-04",
-  "last_run_id": "33843748655",
+  "last_run": "2026-09-05",
+  "last_run_id": "33948915134",
   "monthly_activity_issue": 114,
   "monthly_activity_month": "2026-09",
   "backlog_cursor": null,
   "comments_made": {
-    "issues": [48, 49, 50, 51, 52, 65, 70, 71, 73, 80],
+    "issues": [48, 49, 50, 51, 52, 65, 70, 71, 73, 80, 111],
     "prs": [54, 56, 58, 67, 68, 69, 72]
   },
   "fix_attempts": {
@@ -19,7 +19,8 @@
     "80": "PR #81 (open, clean, priority validation + assignee normalisation, 265 tests pass)",
     "stream-delete-archived": "PR #82 (open, clean, allow stream delete when only archived tasks remain)",
     "resolution-validation": "PR #83 (open, clean, validate spool complete --resolution, 262 tests pass)",
-    "empty-name-validation": "PR #87 (open, clean, reject empty/whitespace task titles and stream names, 264 tests pass, 4 new integration tests)"
+    "empty-name-validation": "PR #87 (open, clean, reject empty/whitespace task titles and stream names, 264 tests pass, 4 new integration tests)",
+    "111": "PR #112 (open, clean, warn when get_current_branch() falls back to main)"
   },
   "improvement_attempts": {
     "deps-update-2026-03-05": "PR #60 (open, updated 2026-09-04: hermit-abi/libredox/mio/smallvec + 6 Rust 1.98 clippy lint fixes; 260 tests pass, zero clippy warnings)",
@@ -55,7 +56,7 @@
     "71": ["help wanted"]
   },
   "pr_ci_status": {
-    "note": "28 open Repo Assist PRs + 4 Maintainer PRs (plus PRs #95-#112 from July-August runs). PR #60 deps branch updated 2026-09-04: 4 new packages + 6 Rust 1.98 clippy lint fixes. All tests pass. Maintainer PRs #68/#69/#72 fail cargo fmt --check. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
+    "note": "44 open Repo Assist PRs + 4 Maintainer PRs = 48 total. PR #60 deps branch updated 2026-09-04: 4 new packages + 6 Rust 1.98 clippy lint fixes. All tests pass. Maintainer PRs #68/#69/#72 fail cargo fmt --check. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
     "checked": "2026-09-04",
     "maintainer_pr_ci": {
       "67": "pass:clean",
@@ -77,21 +78,19 @@
     "combined-filter-tests-gap": "FIXED — PR #88 (2026-05-19) adds apply_filters_and_sort test helper + 15 combined filter tests (status+stream+search intersections, sort correctness). 94 spool-ui tests pass.",
     "silent-tui-reload-errors": "FIXED — PR #89 (2026-05-23) surfaces reload_tasks() errors at all 21 call sites via app.message field. 260 tests pass.",
     "stats-command-gap": "FIXED — PR #90 (2026-05-24) adds spool stats command: compact task count overview by status/stream/priority. 5 new integration tests, 265 tests total.",
-    "clippy-warnings-rust195": "FIXED in two places: PR #91 (2026-05-28) on main branch; PR #60 (2026-09-04 commit) on deps branch for Rust 1.98 enforcement. PR #60 fixes: state.rs collapsible_match Unlink, main.rs collapsible_match BackTab, app.rs sort_by_key x3, archive_tests is_some_and x2, context_tests writeln! empty, benchmarks truncate(true).",
-    "show-json-format-gap": "FIXED — PR #92 (2026-05-30) adds --format json to spool show command. 2 new tests (unit + integration), 262 tests pass. JSON output = full Task struct, consistent with spool list --format json.",
-    "stream-show-json-gap": "FIXED — PR #93 (2026-05-31) adds --format json to spool stream show. JSON output = Stream struct fields + tasks array. 1 new CLI parse test, 261 tests pass. Completes JSON coverage across all 4 read commands.",
+    "clippy-warnings-rust195": "FIXED in two places: PR #91 (2026-05-28) on main branch; PR #60 (2026-09-04 commit) on deps branch for Rust 1.98 enforcement.",
+    "show-json-format-gap": "FIXED — PR #92 (2026-05-30) adds --format json to spool show command. 2 new tests, 262 tests pass.",
+    "stream-show-json-gap": "FIXED — PR #93 (2026-05-31) adds --format json to spool stream show. 1 new CLI parse test, 261 tests pass.",
     "release-pr55-branch": "PR #55 head commit a9d0fa4 on branch repo-assist/release-v1.2.1-74e2acfcd3cf1599 — CHANGELOG correct, includes #53 fix.",
-    "shell-completion-gap": "spool has no shell completion support (no clap_complete dependency). Filing an issue requires new dependency discussion first per AGENTS.md. Defer until PR backlog reduces.",
-    "no-quiet-or-color-flags": "spool CLI has no --quiet or --no-color global flags. Per-command -f flag exists for output format control.",
-    "assign-task-writer-test-gap": "assign_task() in writer.rs has no direct test in writer_tests.rs. State materialization is tested via state_tests.rs. Low priority gap given coverage elsewhere.",
-    "parent-link-gap": "link/unlink events for 'parent' relationship: event model defined, state materialisation complete and tested, but NO writer API (no link_tasks() function) and NO CLI subcommand. PR #62 covers blocks/blocked_by only. parent relationship cannot be created through public API. Defer implementation until backlog reduces.",
-    "json-output-complete": "All 4 read commands now have --format json: spool list (existing), spool stream list (existing), spool show (PR #92), spool stream show (PR #93). JSON output coverage is complete.",
-    "rust-1.98-clippy-lints": "Rust 1.98 introduced new mandatory clippy lints (with -D warnings): writeln_empty_string, suspicious_open_options, map_or_none (now is_some_and). These were breaking CI on PR #60 deps branch. All fixed 2026-09-04."
+    "shell-completion-gap": "spool has no shell completion support. Defer until PR backlog reduces.",
+    "parent-link-gap": "link/unlink events for 'parent' relationship defined in event model but NO writer API and NO CLI subcommand. PR #62 covers blocks/blocked_by only. Defer until backlog reduces.",
+    "json-output-complete": "All 4 read commands now have --format json: spool list (existing), spool stream list (existing), spool show (PR #92), spool stream show (PR #93).",
+    "rust-1.98-clippy-lints": "Rust 1.98 introduced new mandatory clippy lints (writeln_empty_string, suspicious_open_options, map_or_none). All fixed 2026-09-04 in PR #60."
   },
   "task_last_run": {
-    "task1_triage": "2026-06-06",
-    "task2_fix_issues": "2026-05-31",
-    "task3_improvements": "2026-05-31",
+    "task1_triage": "2026-09-05",
+    "task2_fix_issues": "2026-09-05",
+    "task3_improvements": "2026-09-05",
     "task4_deps": "2026-09-04",
     "task5_maintain_prs": "2026-09-04",
     "task6_stale_nudges": "2026-06-02",
@@ -99,10 +98,10 @@
     "task8_release": "2026-06-06",
     "task9_welcome": "2026-06-06",
     "task10_forward": "2026-06-01",
-    "task11_monthly_summary": "2026-09-04"
+    "task11_monthly_summary": "2026-09-05"
   },
   "deps_last_checked": "2026-09-04",
   "deps_pr": 60,
   "deps_pr_branch": "repo-assist/deps-update-2026-03-05-7ddf94a021c0519c",
-  "notes": "September 2026. Run 2026-09-04: Tasks 4/5/11. Updated PR #60 deps branch with 4 new packages (hermit-abi/libredox/mio/smallvec) and fixed 6 Rust 1.98 clippy lints that were blocking CI. Main SHA still 5b7e3a20 — no merges. Next round-robin priority: task2_fix_issues (2026-05-31), task3_improvements (2026-05-31), task10_forward (2026-06-01), task6_stale_nudges (2026-06-02). New PR creation paused — 48+ open PRs await review. Do NOT try push_to_pull_request_branch on PRs #68/#69/#72 ever again."
+  "notes": "September 2026. Run 2026-09-05: Tasks 1/2/3/11. Verified all 10 open issues — all have Repo Assist comments. Confirmed #111 comment existed (July 2026) but was missing from memory; fixed. All fixable issues/improvements have existing PRs — no new PRs needed. Main SHA still 5b7e3a20 — no merges. 48 open PRs await review. Next round-robin priority: task6_stale_nudges (2026-06-02), task7_labels (2026-06-02), task8_release (2026-06-06). Do NOT push to PRs #68/#69/#72 (cannot push to maintainer PRs)."
 }
