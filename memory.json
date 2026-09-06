@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-09-05",
-  "last_run_id": "33948915134",
+  "last_run": "2026-09-06",
+  "last_run_id": "34016181522",
   "monthly_activity_issue": 114,
   "monthly_activity_month": "2026-09",
   "backlog_cursor": null,
@@ -43,7 +43,8 @@
     "stats-command": "PR #90 (open, draft, clean — spool stats command: task count overview by status/stream/priority, 5 new integration tests, 265 tests pass)",
     "clippy-warnings-rust195": "PR #91 (open, draft, clean — fix pre-existing clippy warnings; NOTE: some fixes now also in PR #60 Sep 4 commit; review for unique remaining fixes)",
     "show-json-format": "PR #92 (open, draft, clean — add --format json to spool show; 2 new tests, 262 tests pass, created 2026-05-30)",
-    "stream-show-json-format": "PR #93 (open, draft, clean — add --format json to spool stream show; JSON includes stream fields + tasks array; 1 new test, 261 tests pass, created 2026-05-31)"
+    "stream-show-json-format": "PR #93 (open, draft, clean — add --format json to spool stream show; JSON includes stream fields + tasks array; 1 new test, 261 tests pass, created 2026-05-31)",
+    "concurrency-module-unused": "Issue #115 (filed 2026-09-06 — concurrency.rs declared in lib.rs but write_event_with_version/FileLock/write_with_retry never called; all writes go through writer::write_event with no locking)"
   },
   "stale_pr_nudges": {
     "67": "2026-04-05",
@@ -57,7 +58,7 @@
   },
   "pr_ci_status": {
     "note": "44 open Repo Assist PRs + 4 Maintainer PRs = 48 total. PR #60 deps branch updated 2026-09-04: 4 new packages + 6 Rust 1.98 clippy lint fixes. All tests pass. Maintainer PRs #68/#69/#72 fail cargo fmt --check. IMPORTANT: push_to_pull_request_branch CANNOT push to maintainer PRs — tool requires '[Repo Assist]' title prefix.",
-    "checked": "2026-09-04",
+    "checked": "2026-09-06",
     "maintainer_pr_ci": {
       "67": "pass:clean",
       "68": "cargo_fmt_needed:cannot_push:commented_2026-05-07",
@@ -85,7 +86,9 @@
     "shell-completion-gap": "spool has no shell completion support. Defer until PR backlog reduces.",
     "parent-link-gap": "link/unlink events for 'parent' relationship defined in event model but NO writer API and NO CLI subcommand. PR #62 covers blocks/blocked_by only. Defer until backlog reduces.",
     "json-output-complete": "All 4 read commands now have --format json: spool list (existing), spool stream list (existing), spool show (PR #92), spool stream show (PR #93).",
-    "rust-1.98-clippy-lints": "Rust 1.98 introduced new mandatory clippy lints (writeln_empty_string, suspicious_open_options, map_or_none). All fixed 2026-09-04 in PR #60."
+    "rust-1.98-clippy-lints": "Rust 1.98 introduced new mandatory clippy lints (writeln_empty_string, suspicious_open_options, map_or_none). All fixed 2026-09-04 in PR #60.",
+    "concurrency-module-dead-code": "concurrency.rs is declared as pub mod in lib.rs and provides FileLock, write_event_with_version, write_with_retry, get_task_version — but NONE of these are called anywhere in the codebase. All writes go through writer::write_event() with no concurrency protection. Issue #115 filed 2026-09-06. Maintainer must decide: integrate (safer) or remove (simpler).",
+    "migration-branch-silent-fallback": "get_migration_branch() in migration.rs (lines 283-293) silently returns 'main' on git failure — same pattern as issue #111 for writer.rs. This affects the migration path (one-time, not every write). Noted in issue #115 body as secondary observation."
   },
   "task_last_run": {
     "task1_triage": "2026-09-05",
@@ -93,15 +96,16 @@
     "task3_improvements": "2026-09-05",
     "task4_deps": "2026-09-04",
     "task5_maintain_prs": "2026-09-04",
-    "task6_stale_nudges": "2026-06-02",
-    "task7_labels": "2026-06-02",
+    "task6_stale_nudges": "2026-09-06",
+    "task7_labels": "2026-09-06",
     "task8_release": "2026-06-06",
     "task9_welcome": "2026-06-06",
-    "task10_forward": "2026-06-01",
-    "task11_monthly_summary": "2026-09-05"
+    "task10_forward": "2026-09-06",
+    "task11_monthly_summary": "2026-09-06"
   },
   "deps_last_checked": "2026-09-04",
   "deps_pr": 60,
   "deps_pr_branch": "repo-assist/deps-update-2026-03-05-7ddf94a021c0519c",
-  "notes": "September 2026. Run 2026-09-05: Tasks 1/2/3/11. Verified all 10 open issues — all have Repo Assist comments. Confirmed #111 comment existed (July 2026) but was missing from memory; fixed. All fixable issues/improvements have existing PRs — no new PRs needed. Main SHA still 5b7e3a20 — no merges. 48 open PRs await review. Next round-robin priority: task6_stale_nudges (2026-06-02), task7_labels (2026-06-02), task8_release (2026-06-06). Do NOT push to PRs #68/#69/#72 (cannot push to maintainer PRs)."
+  "open_issues": [49, 51, 52, 61, 70, 71, 73, 80, 111, 114, 115],
+  "notes": "September 2026. Run 2026-09-06: Tasks 7/10/11. Task 7: all 48 PRs and 10 issues are appropriately labeled — no changes needed. Task 10: discovered concurrency.rs (FileLock, write_event_with_version, write_with_retry) is declared in lib.rs but NEVER called anywhere — filed issue #115. Task 6: skipped — 4 maintainer PRs already nudged in April 2026; all covered in monthly activity issue; re-nudging would be redundant. Main SHA still 5b7e3a20 — no merges. 48 open PRs await review. Next round-robin priority: task8_release (2026-06-06), task9_welcome (2026-06-06), task1_triage (2026-09-05). Do NOT push to PRs #68/#69/#72 (cannot push to maintainer PRs)."
 }
