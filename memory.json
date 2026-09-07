@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-09-06",
-  "last_run_id": "34016181522",
+  "last_run": "2026-09-07",
+  "last_run_id": "34090902089",
   "monthly_activity_issue": 114,
   "monthly_activity_month": "2026-09",
   "backlog_cursor": null,
@@ -91,21 +91,21 @@
     "migration-branch-silent-fallback": "get_migration_branch() in migration.rs (lines 283-293) silently returns 'main' on git failure — same pattern as issue #111 for writer.rs. This affects the migration path (one-time, not every write). Noted in issue #115 body as secondary observation."
   },
   "task_last_run": {
-    "task1_triage": "2026-09-05",
+    "task1_triage": "2026-09-07",
     "task2_fix_issues": "2026-09-05",
     "task3_improvements": "2026-09-05",
     "task4_deps": "2026-09-04",
     "task5_maintain_prs": "2026-09-04",
     "task6_stale_nudges": "2026-09-06",
     "task7_labels": "2026-09-06",
-    "task8_release": "2026-06-06",
-    "task9_welcome": "2026-06-06",
+    "task8_release": "2026-09-07",
+    "task9_welcome": "2026-09-07",
     "task10_forward": "2026-09-06",
-    "task11_monthly_summary": "2026-09-06"
+    "task11_monthly_summary": "2026-09-07"
   },
   "deps_last_checked": "2026-09-04",
   "deps_pr": 60,
   "deps_pr_branch": "repo-assist/deps-update-2026-03-05-7ddf94a021c0519c",
   "open_issues": [49, 51, 52, 61, 70, 71, 73, 80, 111, 114, 115],
-  "notes": "September 2026. Run 2026-09-06: Tasks 7/10/11. Task 7: all 48 PRs and 10 issues are appropriately labeled — no changes needed. Task 10: discovered concurrency.rs (FileLock, write_event_with_version, write_with_retry) is declared in lib.rs but NEVER called anywhere — filed issue #115. Task 6: skipped — 4 maintainer PRs already nudged in April 2026; all covered in monthly activity issue; re-nudging would be redundant. Main SHA still 5b7e3a20 — no merges. 48 open PRs await review. Next round-robin priority: task8_release (2026-06-06), task9_welcome (2026-06-06), task1_triage (2026-09-05). Do NOT push to PRs #68/#69/#72 (cannot push to maintainer PRs)."
+  "notes": "September 2026. Run 2026-09-07: Tasks 1/8/9/11. Task 1: all 11 open issues have Repo Assist comments — nothing new. Task 8: PR #55 (v1.2.1) still open, main SHA unchanged (5b7e3a20), no new release work needed. Task 9: no new human contributors in last 24 hours — nothing to welcome. Task 11: updated monthly activity issue #114 with this run's entry. Main SHA still 5b7e3a20 — no merges since 2026-03-04. 48 open PRs await review. Next round-robin priority: task5_maintain_prs (2026-09-04), task4_deps (2026-09-04), task2_fix_issues (2026-09-05). Do NOT push to PRs #68/#69/#72 (cannot push to maintainer PRs)."
 }
