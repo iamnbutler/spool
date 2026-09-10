@@ -30,6 +30,10 @@ fn test_cli_parse_list_defaults() {
         stream,
         stream_name,
         no_stream,
+        created_after,
+        created_before,
+        updated_after,
+        updated_before,
         format,
     } = cli.command
     {
@@ -40,6 +44,10 @@ fn test_cli_parse_list_defaults() {
         assert!(stream.is_none());
         assert!(stream_name.is_none());
         assert!(!no_stream);
+        assert!(created_after.is_none());
+        assert!(created_before.is_none());
+        assert!(updated_after.is_none());
+        assert!(updated_before.is_none());
         assert_eq!(format, "table");
     } else {
         panic!("Expected List command");
@@ -687,5 +695,37 @@ fn test_cli_parse_stream_delete() {
         }
     } else {
         panic!("Expected Stream command");
+    }
+}
+
+#[test]
+fn test_cli_parse_list_date_filters() {
+    let cli = Cli::parse_from([
+        "spool",
+        "list",
+        "--created-after",
+        "2024-01-01",
+        "--created-before",
+        "2024-12-31",
+        "--updated-after",
+        "2024-06-01",
+        "--updated-before",
+        "2024-09-30",
+    ]);
+
+    if let Commands::List {
+        created_after,
+        created_before,
+        updated_after,
+        updated_before,
+        ..
+    } = cli.command
+    {
+        assert_eq!(created_after.as_deref(), Some("2024-01-01"));
+        assert_eq!(created_before.as_deref(), Some("2024-12-31"));
+        assert_eq!(updated_after.as_deref(), Some("2024-06-01"));
+        assert_eq!(updated_before.as_deref(), Some("2024-09-30"));
+    } else {
+        panic!("Expected List command");
     }
 }

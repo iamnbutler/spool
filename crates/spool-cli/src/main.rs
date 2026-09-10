@@ -4,8 +4,8 @@ use clap::Parser;
 use spool::archive::archive_tasks;
 use spool::cli::{
     add_stream, add_task, assign_task, claim_task, complete_task, delete_stream, free_task,
-    list_streams, list_tasks, reopen_task, show_stream, show_task, update_stream_cmd, update_task,
-    Cli, Commands, OutputFormat, StreamCommands,
+    list_streams, list_tasks, parse_date, reopen_task, show_stream, show_task, update_stream_cmd,
+    update_task, Cli, Commands, OutputFormat, StreamCommands,
 };
 use spool::context::{init, SpoolContext};
 use spool::state::rebuild;
@@ -43,10 +43,18 @@ fn main() -> Result<()> {
             stream,
             stream_name,
             no_stream,
+            created_after,
+            created_before,
+            updated_after,
+            updated_before,
             format,
         } => {
             let ctx = SpoolContext::discover()?;
             let fmt = OutputFormat::from_str(&format);
+            let ca = created_after.as_deref().map(parse_date).transpose()?;
+            let cb = created_before.as_deref().map(parse_date).transpose()?;
+            let ua = updated_after.as_deref().map(parse_date).transpose()?;
+            let ub = updated_before.as_deref().map(parse_date).transpose()?;
             list_tasks(
                 &ctx,
                 Some(&status),
@@ -56,6 +64,10 @@ fn main() -> Result<()> {
                 stream.as_deref(),
                 stream_name.as_deref(),
                 no_stream,
+                ca,
+                cb,
+                ua,
+                ub,
                 fmt,
             )
         }

@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 
 use crate::archive::collect_all_events;
@@ -67,6 +68,18 @@ pub enum Commands {
         /// Show only tasks without a stream
         #[arg(long, conflicts_with_all = ["stream", "stream_name"])]
         no_stream: bool,
+        /// Show tasks created on or after this date (YYYY-MM-DD)
+        #[arg(long)]
+        created_after: Option<String>,
+        /// Show tasks created on or before this date (YYYY-MM-DD)
+        #[arg(long)]
+        created_before: Option<String>,
+        /// Show tasks updated on or after this date (YYYY-MM-DD)
+        #[arg(long)]
+        updated_after: Option<String>,
+        /// Show tasks updated on or before this date (YYYY-MM-DD)
+        #[arg(long)]
+        updated_before: Option<String>,
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table")]
         format: String,
@@ -211,6 +224,11 @@ impl OutputFormat {
     }
 }
 
+pub fn parse_date(s: &str) -> Result<NaiveDate> {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .map_err(|_| anyhow!("Invalid date '{}': expected YYYY-MM-DD format", s))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn list_tasks(
     ctx: &SpoolContext,
@@ -221,6 +239,10 @@ pub fn list_tasks(
     stream: Option<&str>,
     stream_name: Option<&str>,
     no_stream: bool,
+    created_after: Option<NaiveDate>,
+    created_before: Option<NaiveDate>,
+    updated_after: Option<NaiveDate>,
+    updated_before: Option<NaiveDate>,
     format: OutputFormat,
 ) -> Result<()> {
     let state = load_or_materialize_state(ctx)?;
@@ -272,7 +294,32 @@ pub fn list_tasks(
                     .unwrap_or(true)
             };
 
-            status_match && assignee_match && tag_match && priority_match && stream_match
+            // Date-range filters (all inclusive)
+            let created_date = t.created.date_naive();
+            let created_after_match = created_after
+                .map(|d| created_date >= d)
+                .unwrap_or(true);
+            let created_before_match = created_before
+                .map(|d| created_date <= d)
+                .unwrap_or(true);
+
+            let updated_date = t.updated.date_naive();
+            let updated_after_match = updated_after
+                .map(|d| updated_date >= d)
+                .unwrap_or(true);
+            let updated_before_match = updated_before
+                .map(|d| updated_date <= d)
+                .unwrap_or(true);
+
+            status_match
+                && assignee_match
+                && tag_match
+                && priority_match
+                && stream_match
+                && created_after_match
+                && created_before_match
+                && updated_after_match
+                && updated_before_match
         })
         .collect();
 

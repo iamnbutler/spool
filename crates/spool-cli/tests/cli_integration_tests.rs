@@ -945,3 +945,114 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("JSON Stream"));
 }
+
+// ── Date-range filter tests ───────────────────────────────────────────────
+
+fn two_task_events() -> &'static str {
+    concat!(
+        r#"{"v":1,"op":"create","id":"old-task","ts":"2024-01-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old task"}}"#,
+        "\n",
+        r#"{"v":1,"op":"create","id":"new-task","ts":"2024-06-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"New task"}}"#
+    )
+}
+
+#[test]
+fn test_list_created_after_includes_matching_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(&temp_dir, two_task_events());
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-after", "2024-06-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("new-task"))
+        .stdout(predicate::str::contains("New task"))
+        .stdout(predicate::str::contains("old-task").not());
+}
+
+#[test]
+fn test_list_created_before_includes_matching_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(&temp_dir, two_task_events());
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-before", "2024-03-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("old-task"))
+        .stdout(predicate::str::contains("new-task").not());
+}
+
+#[test]
+fn test_list_created_after_and_before_range() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    // Three tasks at different dates
+    let events = concat!(
+        r#"{"v":1,"op":"create","id":"jan-task","ts":"2024-01-10T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Jan task"}}"#,
+        "\n",
+        r#"{"v":1,"op":"create","id":"mar-task","ts":"2024-03-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Mar task"}}"#,
+        "\n",
+        r#"{"v":1,"op":"create","id":"dec-task","ts":"2024-12-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Dec task"}}"#
+    );
+    write_test_events(&temp_dir, events);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args([
+            "list",
+            "--created-after",
+            "2024-02-01",
+            "--created-before",
+            "2024-06-01",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("mar-task"))
+        .stdout(predicate::str::contains("jan-task").not())
+        .stdout(predicate::str::contains("dec-task").not());
+}
+
+#[test]
+fn test_list_invalid_date_returns_error() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-after", "not-a-date"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid date"));
+}
+
+#[test]
+fn test_list_updated_after_filters_correctly() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    // One task created Jan, updated in July; one task created and updated Jan
+    let events = concat!(
+        r#"{"v":1,"op":"create","id":"updated-task","ts":"2024-01-10T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Updated task"}}"#,
+        "\n",
+        r#"{"v":1,"op":"update","id":"updated-task","ts":"2024-07-20T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Updated task v2"}}"#,
+        "\n",
+        r#"{"v":1,"op":"create","id":"stale-task","ts":"2024-01-10T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Stale task"}}"#
+    );
+    write_test_events(&temp_dir, events);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--updated-after", "2024-07-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("updated-task"))
+        .stdout(predicate::str::contains("stale-task").not());
+}
