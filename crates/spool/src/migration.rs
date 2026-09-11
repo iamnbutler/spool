@@ -288,6 +288,18 @@ fn get_migration_branch() -> String {
         if output.status.success() {
             return String::from_utf8_lossy(&output.stdout).trim().to_string();
         }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = stderr.trim();
+        if stderr.is_empty() {
+            eprintln!(
+                "warning: could not detect current git branch for migration; recording as \"main\""
+            );
+        } else {
+            eprintln!(
+                "warning: could not detect current git branch for migration ({}); recording as \"main\"",
+                stderr
+            );
+        }
     }
     "main".to_string()
 }
