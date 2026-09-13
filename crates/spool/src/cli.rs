@@ -295,19 +295,46 @@ pub fn list_tasks(
                 return Ok(());
             }
 
-            println!("{:<15} {:<10} {:<12} TITLE", "ID", "PRIORITY", "ASSIGNEE");
-            for task in &tasks {
-                let priority = task.priority.as_deref().unwrap_or("-");
-                let assignee = task.assignee.as_deref().unwrap_or("-");
-                let title = if task.title.len() > 50 {
-                    format!("{}...", &task.title[..47])
-                } else {
-                    task.title.clone()
-                };
+            let show_complete_cols = matches!(status_filter, Some("complete"));
+
+            if show_complete_cols {
                 println!(
-                    "{:<15} {:<10} {:<12} {}",
-                    task.id, priority, assignee, title
+                    "{:<15} {:<10} {:<12} {:<12} {:<10} TITLE",
+                    "ID", "PRIORITY", "ASSIGNEE", "COMPLETED", "RESOLUTION"
                 );
+                for task in &tasks {
+                    let priority = task.priority.as_deref().unwrap_or("-");
+                    let assignee = task.assignee.as_deref().unwrap_or("-");
+                    let completed = task
+                        .completed
+                        .map(|d| d.date_naive().to_string())
+                        .unwrap_or_else(|| "-".to_string());
+                    let resolution = task.resolution.as_deref().unwrap_or("-");
+                    let title = if task.title.len() > 50 {
+                        format!("{}...", &task.title[..47])
+                    } else {
+                        task.title.clone()
+                    };
+                    println!(
+                        "{:<15} {:<10} {:<12} {:<12} {:<10} {}",
+                        task.id, priority, assignee, completed, resolution, title
+                    );
+                }
+            } else {
+                println!("{:<15} {:<10} {:<12} TITLE", "ID", "PRIORITY", "ASSIGNEE");
+                for task in &tasks {
+                    let priority = task.priority.as_deref().unwrap_or("-");
+                    let assignee = task.assignee.as_deref().unwrap_or("-");
+                    let title = if task.title.len() > 50 {
+                        format!("{}...", &task.title[..47])
+                    } else {
+                        task.title.clone()
+                    };
+                    println!(
+                        "{:<15} {:<10} {:<12} {}",
+                        task.id, priority, assignee, title
+                    );
+                }
             }
         }
     }

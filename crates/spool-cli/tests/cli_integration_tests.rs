@@ -158,6 +158,43 @@ fn test_list_status_filter_complete() {
 }
 
 #[test]
+fn test_list_complete_shows_completion_columns() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Completed task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-002","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    // --status complete shows COMPLETED and RESOLUTION columns
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "complete"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("COMPLETED"))
+        .stdout(predicate::str::contains("RESOLUTION"))
+        .stdout(predicate::str::contains("2024-01-15"))
+        .stdout(predicate::str::contains("done"))
+        .stdout(predicate::str::contains("task-002"));
+
+    // Default list does not show COMPLETED/RESOLUTION columns
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("COMPLETED").not())
+        .stdout(predicate::str::contains("RESOLUTION").not());
+}
+
+#[test]
 fn test_show_task() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);
