@@ -330,10 +330,10 @@ impl App {
                 });
             }
             SortBy::Created => {
-                tasks.sort_by(|a, b| b.created.cmp(&a.created));
+                tasks.sort_by_key(|a| std::cmp::Reverse(a.created));
             }
             SortBy::Title => {
-                tasks.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+                tasks.sort_by_key(|a| a.title.to_lowercase());
             }
         }
     }
@@ -1047,7 +1047,7 @@ impl App {
         let events_by_task = spool::archive::collect_all_events(&self.ctx)?;
         let mut all_events: Vec<Event> = events_by_task.into_values().flatten().collect();
         // Sort by timestamp descending (most recent first)
-        all_events.sort_by(|a, b| b.ts.cmp(&a.ts));
+        all_events.sort_by_key(|a| std::cmp::Reverse(a.ts));
         self.history_events = all_events;
         self.history_selected = 0;
         self.history_list_state.select(Some(0));

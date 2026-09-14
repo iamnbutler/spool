@@ -244,10 +244,8 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                                     app.history_next();
                                 }
                             }
-                            KeyCode::BackTab => {
-                                if app.history_show_detail {
-                                    app.history_previous();
-                                }
+                            KeyCode::BackTab if app.history_show_detail => {
+                                app.history_previous();
                             }
                             _ => {}
                         },

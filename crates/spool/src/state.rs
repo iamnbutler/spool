@@ -275,10 +275,8 @@ fn apply_event(
                     match rel {
                         "blocks" => task.blocks.retain(|x| x != target),
                         "blocked_by" => task.blocked_by.retain(|x| x != target),
-                        "parent" => {
-                            if task.parent.as_deref() == Some(target) {
-                                task.parent = None;
-                            }
+                        "parent" if task.parent.as_deref() == Some(target) => {
+                            task.parent = None;
                         }
                         _ => {}
                     }
