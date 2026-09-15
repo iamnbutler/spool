@@ -4,17 +4,16 @@ A shared task board for coding agents. Plan work in streams, claim a ready task,
 
 Agents in the same repository's Git worktrees share a live board. Claims are atomic, expire when abandoned, and carry a token that prevents a stale worker from changing reclaimed work. Durable task history travels with Git. [Telephone](https://nate.rip/telephone/) provides agent discovery and messaging.
 
-## Try this branch
+## Install
 
-Requires Rust 1.88+ and Git 2.31+.
+Install from crates.io with Rust 1.88+, or download the CLI and TUI binaries for Linux and macOS from [GitHub Releases](https://github.com/iamnbutler/spool/releases/tag/v2.0.0).
 
 ```sh
-cargo build --release -p spool-cli
-export PATH="$PWD/target/release:$PATH"
+cargo install spool-cli --version 2.0.0 --locked
 spool prime
 ```
 
-This collaboration workflow is unreleased; build from this checkout. To install this checkout's binary permanently, use `cargo install --path crates/spool-cli --locked`. All participating agents should use the same version.
+Shared worktree boards require Git 2.31+. All participating agents should use the same version. To install from a source checkout, use `cargo install --path crates/spool-cli --locked`.
 
 ## The work loop
 
@@ -163,7 +162,7 @@ See [the short agent guide](skills/spool.md) for the task workflow.
 
 ## Optional TUI
 
-`cargo run -p spool-ui` opens the board. It shows active agents and lease expiry and watches shared task and lease events. The `a` action reserves a task for the current user. Active agent claims are protected from TUI edits; use the CLI with the current token for lease operations. Press `?` for shortcuts.
+Install with `cargo install spool-ui --version 2.0.0 --locked`, then run `spool-ui` to open the board. From a source checkout, use `cargo run -p spool-ui`. It shows active agents and lease expiry and watches shared task and lease events. The `a` action reserves a task for the current user. Active agent claims are protected from TUI edits; use the CLI with the current token for lease operations. Press `?` for shortcuts.
 
 ## Development
 

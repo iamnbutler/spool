@@ -2,7 +2,7 @@
 
 All notable changes to Spool will be documented in this file.
 
-## Unreleased — agent collaboration
+## [2.0.0] - 2026-09-15
 
 - Shared local board across Git worktrees, with explicit `sync` to export durable history.
 - Atomic leased `claim` / `next`, session identities, renewal, and tokens that fence stale workers.
@@ -13,7 +13,7 @@ All notable changes to Spool will be documented in this file.
 - Patched the locked anyhow, rand, and crossbeam-epoch versions flagged by the dependency audit.
 - Rust minimum corrected to 1.88 to match the locked dependency set.
 
-**Workflow changes:** claims require a unique agent identity; modifying claimed work requires its token. Run `spool sync` before committing task history. The board format marker is now `0.5.0`; use compatible binaries for all workers. Claims coordinate one local board and are excluded from Git exports.
+**Breaking workflow changes:** claims require a unique agent identity; modifying claimed work requires its token. Run `spool sync` before committing task history. The board format marker is now `0.5.0`; use compatible binaries for all workers. Claims coordinate one local board and are excluded from Git exports.
 
 ## [1.0.0] - 2026-01-25
 
