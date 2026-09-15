@@ -10,13 +10,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use crate::concurrency::FileLock;
 use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
 use crate::id::generate_id;
-use crate::writer::write_event;
+use crate::store::publish;
 
 /// Current format version
-pub const CURRENT_FORMAT_VERSION: &str = "0.4.0";
+pub const CURRENT_FORMAT_VERSION: &str = "0.5.0";
 
 /// Version file structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,14 +55,23 @@ pub fn read_version(ctx: &SpoolContext) -> Option<VersionInfo> {
 /// Write version info to disk
 fn write_version(ctx: &SpoolContext, version: &VersionInfo) -> Result<()> {
     let path = version_path(ctx);
-    let content = serde_json::to_string_pretty(version)?;
-    fs::write(&path, content).with_context(|| format!("Failed to write {:?}", path))?;
+    crate::store::write_json(&path, version)
+        .with_context(|| format!("Failed to write {:?}", path))?;
     Ok(())
 }
 
 /// Check if migration is needed and perform it
 pub fn check_and_migrate(ctx: &SpoolContext) -> Result<()> {
-    let version = read_version(ctx);
+    let _lock = FileLock::acquire(ctx)?;
+    // A corrupt marker must not be mistaken for an old board and migrated.
+    let version: Option<VersionInfo> = if version_path(ctx).exists() {
+        Some(
+            serde_json::from_str(&fs::read_to_string(version_path(ctx))?)
+                .context("Invalid Spool version.json")?,
+        )
+    } else {
+        None
+    };
 
     match version {
         Some(v) if v.format_version == CURRENT_FORMAT_VERSION => {
@@ -88,7 +98,17 @@ pub fn check_and_migrate(ctx: &SpoolContext) -> Result<()> {
                 write_version(ctx, &version)?;
             } else {
                 // Pre-0.4.0 spool, need migration
-                migrate_from_version(ctx, "0.3.1")?;
+                let has_stream_entities = crate::store::read_events(ctx, false)?
+                    .iter()
+                    .any(|event| event.op == Operation::CreateStream);
+                migrate_from_version(
+                    ctx,
+                    if has_stream_entities {
+                        "0.4.0"
+                    } else {
+                        "0.3.1"
+                    },
+                )?;
             }
             Ok(())
         }
@@ -97,21 +117,13 @@ pub fn check_and_migrate(ctx: &SpoolContext) -> Result<()> {
 
 /// Migrate from a specific version to current
 fn migrate_from_version(ctx: &SpoolContext, from_version: &str) -> Result<()> {
-    eprintln!(
-        "Migrating spool from {} to {}...",
-        from_version, CURRENT_FORMAT_VERSION
-    );
-
     match from_version {
+        "0.4.0" => {}
         "0.3.1" | "0.3.0" | "0.2.0" | "0.1.0" => {
             migrate_0_3_1_to_0_4_0(ctx)?;
         }
         _ => {
-            eprintln!(
-                "  Warning: Unknown version {}, attempting migration anyway",
-                from_version
-            );
-            migrate_0_3_1_to_0_4_0(ctx)?;
+            anyhow::bail!("Unsupported Spool format version {from_version}; upgrade Spool before opening this board");
         }
     }
 
@@ -125,8 +137,6 @@ fn migrate_from_version(ctx: &SpoolContext, from_version: &str) -> Result<()> {
     // Clear cache files to force rebuild
     let _ = fs::remove_file(ctx.state_path());
     let _ = fs::remove_file(ctx.index_path());
-
-    eprintln!("Migration complete.");
     Ok(())
 }
 
@@ -137,8 +147,6 @@ fn migrate_from_version(ctx: &SpoolContext, from_version: &str) -> Result<()> {
 /// 2. Creates CreateStream events for each unique stream name
 /// 3. Updates tasks to reference stream IDs instead of names (via SetStream events)
 fn migrate_0_3_1_to_0_4_0(ctx: &SpoolContext) -> Result<()> {
-    eprintln!("  Converting implicit streams to explicit stream entities...");
-
     // Collect all unique stream names and the tasks that use them
     let mut stream_names: HashMap<String, Vec<String>> = HashMap::new(); // name -> [task_ids]
     let mut task_streams: HashMap<String, String> = HashMap::new(); // task_id -> stream_name
@@ -156,11 +164,8 @@ fn migrate_0_3_1_to_0_4_0(ctx: &SpoolContext) -> Result<()> {
     }
 
     if stream_names.is_empty() {
-        eprintln!("  No streams found, nothing to migrate.");
         return Ok(());
     }
-
-    eprintln!("  Found {} streams to convert", stream_names.len());
 
     // Get migration user info
     let user = get_migration_user();
@@ -187,8 +192,7 @@ fn migrate_0_3_1_to_0_4_0(ctx: &SpoolContext) -> Result<()> {
             }),
         };
 
-        write_event(ctx, &event)?;
-        eprintln!("  Created stream: {} ({})", stream_name, stream_id);
+        publish(&ctx.events_dir, &event)?;
     }
 
     // Update tasks to use stream IDs instead of names
@@ -206,14 +210,9 @@ fn migrate_0_3_1_to_0_4_0(ctx: &SpoolContext) -> Result<()> {
                 }),
             };
 
-            write_event(ctx, &event)?;
+            publish(&ctx.events_dir, &event)?;
         }
     }
-
-    eprintln!(
-        "  Updated {} tasks with stream references",
-        task_streams.len()
-    );
 
     Ok(())
 }

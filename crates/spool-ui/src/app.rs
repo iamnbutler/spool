@@ -244,9 +244,9 @@ impl App {
         })
     }
 
-    /// Returns the path to the events directory for file watching
-    pub fn events_dir(&self) -> &std::path::Path {
-        &self.ctx.events_dir
+    /// Returns the shared board directory for file watching.
+    pub fn board_dir(&self) -> &std::path::Path {
+        &self.ctx.root
     }
 
     pub fn reload_tasks(&mut self) -> Result<()> {
@@ -330,10 +330,10 @@ impl App {
                 });
             }
             SortBy::Created => {
-                tasks.sort_by(|a, b| b.created.cmp(&a.created));
+                tasks.sort_by_key(|task| std::cmp::Reverse(task.created));
             }
             SortBy::Title => {
-                tasks.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+                tasks.sort_by_key(|a| a.title.to_lowercase());
             }
         }
     }
@@ -607,7 +607,7 @@ impl App {
     }
 
     // Task assignment
-    pub fn claim_selected_task(&mut self) {
+    pub fn assign_selected_task_to_me(&mut self) {
         if let Some(task) = self.selected_task() {
             let id = task.id.clone();
             let by = writer::get_current_user().unwrap_or_else(|_| "unknown".to_string());
@@ -615,7 +615,7 @@ impl App {
 
             match writer::assign_task(&self.ctx, &id, Some(&by), &by, &branch) {
                 Ok(()) => {
-                    self.message = Some(format!("Claimed: {}", id));
+                    self.message = Some(format!("Assigned to you: {}", id));
                     let _ = self.reload_tasks();
                 }
                 Err(e) => {
@@ -1047,7 +1047,7 @@ impl App {
         let events_by_task = spool::archive::collect_all_events(&self.ctx)?;
         let mut all_events: Vec<Event> = events_by_task.into_values().flatten().collect();
         // Sort by timestamp descending (most recent first)
-        all_events.sort_by(|a, b| b.ts.cmp(&a.ts));
+        all_events.sort_by_key(|event| std::cmp::Reverse(event.ts));
         self.history_events = all_events;
         self.history_selected = 0;
         self.history_list_state.select(Some(0));

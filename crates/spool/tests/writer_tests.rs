@@ -42,13 +42,16 @@ fn test_write_event_creates_file() {
     assert_eq!(event_files.len(), 1);
 
     // Verify content
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     assert!(content.contains("test-001"));
     assert!(content.contains("Test task"));
 }
 
 #[test]
-fn test_write_event_appends_to_existing_file() {
+fn test_write_event_publishes_independent_files() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
@@ -76,12 +79,15 @@ fn test_write_event_appends_to_existing_file() {
     write_event(&ctx, &event1).unwrap();
     write_event(&ctx, &event2).unwrap();
 
-    // Verify still one file
+    // Each append publishes a separate complete file.
     let event_files = ctx.get_event_files().unwrap();
-    assert_eq!(event_files.len(), 1);
+    assert_eq!(event_files.len(), 2);
 
     // Verify both events in file
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     let lines: Vec<&str> = content.lines().collect();
     assert_eq!(lines.len(), 2);
     assert!(lines[0].contains("test-001"));
@@ -112,7 +118,10 @@ fn test_create_task_returns_id() {
     let event_files = ctx.get_event_files().unwrap();
     assert_eq!(event_files.len(), 1);
 
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     assert!(content.contains(&id));
     assert!(content.contains("Test task"));
 }
@@ -139,7 +148,10 @@ fn test_create_task_with_all_fields() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains(&id));
     assert!(content.contains("Full task"));
@@ -156,6 +168,12 @@ fn test_update_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
     update_task(
         &ctx,
@@ -169,7 +187,10 @@ fn test_update_task_writes_event() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("task-001"));
     assert!(content.contains("update"));
@@ -183,6 +204,12 @@ fn test_update_task_partial_fields() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
     // Update only title
     update_task(
@@ -197,7 +224,10 @@ fn test_update_task_partial_fields() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("Only title"));
     assert!(!content.contains("description"));
@@ -224,11 +254,20 @@ fn test_complete_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
     complete_task(&ctx, "task-001", Some("done"), "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("task-001"));
     assert!(content.contains("complete"));
@@ -240,11 +279,20 @@ fn test_complete_task_default_resolution() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
     complete_task(&ctx, "task-001", None, "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("done")); // Default resolution
 }
@@ -254,11 +302,20 @@ fn test_complete_task_wontfix_resolution() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
     complete_task(&ctx, "task-001", Some("wontfix"), "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("wontfix"));
 }
@@ -268,11 +325,21 @@ fn test_reopen_task_writes_event() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::Create,
+        "task-001",
+        serde_json::json!({"title": "Original"}),
+    );
 
+    complete_task(&ctx, "task-001", None, "@tester", "main").unwrap();
     reopen_task(&ctx, "task-001", "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("task-001"));
     assert!(content.contains("reopen"));
@@ -357,7 +424,10 @@ fn test_event_json_format() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     // Should be valid JSON
     let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
@@ -377,6 +447,12 @@ fn test_create_task_with_stream() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::CreateStream,
+        "my-stream",
+        serde_json::json!({"name": "my-stream"}),
+    );
 
     let _id = create_task(
         &ctx,
@@ -391,7 +467,10 @@ fn test_create_task_with_stream() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     assert!(content.contains("\"stream\":\"my-stream\""));
 }
@@ -401,6 +480,12 @@ fn test_set_stream_writes_event() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::CreateStream,
+        "agent-work",
+        serde_json::json!({"name": "agent-work"}),
+    );
 
     // Create a task first
     let id = create_task(
@@ -418,14 +503,17 @@ fn test_set_stream_writes_event() {
     set_stream(&ctx, &id, Some("agent-work"), "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     // Should have two events
     let lines: Vec<&str> = content.lines().collect();
-    assert_eq!(lines.len(), 2);
+    assert_eq!(lines.len(), 3);
 
     // Second event should be set_stream
-    let set_stream_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    let set_stream_event: serde_json::Value = serde_json::from_str(lines[2]).unwrap();
     assert_eq!(set_stream_event["op"], "set_stream");
     assert_eq!(set_stream_event["id"], id);
     assert_eq!(set_stream_event["d"]["stream"], "agent-work");
@@ -436,6 +524,12 @@ fn test_set_stream_to_none() {
     let temp_dir = TempDir::new().unwrap();
     let spool_dir = setup_spool_dir(&temp_dir);
     let ctx = create_test_context(&spool_dir);
+    seed(
+        &ctx,
+        Operation::CreateStream,
+        "old-stream",
+        serde_json::json!({"name": "old-stream"}),
+    );
 
     let id = create_task(
         &ctx,
@@ -453,10 +547,13 @@ fn test_set_stream_to_none() {
     set_stream(&ctx, &id, None, "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
 
     let lines: Vec<&str> = content.lines().collect();
-    let set_stream_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+    let set_stream_event: serde_json::Value = serde_json::from_str(lines[2]).unwrap();
     assert_eq!(set_stream_event["op"], "set_stream");
     assert!(set_stream_event["d"]["stream"].is_null());
 }
@@ -478,12 +575,15 @@ fn test_create_stream_returns_id() {
     let event_files = ctx.get_event_files().unwrap();
     assert_eq!(event_files.len(), 1);
 
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     let event: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
 
     assert_eq!(event["op"], "create_stream");
     assert_eq!(event["id"], id);
-    assert_eq!(event["d"]["name"], "My Project");
+    assert_eq!(event["d"]["name"], "my project");
 }
 
 #[test]
@@ -502,12 +602,15 @@ fn test_create_stream_with_description() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     let event: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
 
     assert_eq!(event["op"], "create_stream");
     assert_eq!(event["id"], id);
-    assert_eq!(event["d"]["name"], "Backend");
+    assert_eq!(event["d"]["name"], "backend");
     assert_eq!(event["d"]["description"], "Backend development tasks");
 }
 
@@ -532,14 +635,17 @@ fn test_update_stream_writes_event() {
     .unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     let lines: Vec<&str> = content.lines().collect();
     assert_eq!(lines.len(), 2);
 
     let update_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(update_event["op"], "update_stream");
     assert_eq!(update_event["id"], id);
-    assert_eq!(update_event["d"]["name"], "New Name");
+    assert_eq!(update_event["d"]["name"], "new name");
     assert_eq!(update_event["d"]["description"], "Updated description");
 }
 
@@ -571,11 +677,30 @@ fn test_delete_stream_writes_event() {
     delete_stream(&ctx, &id, "@tester", "main").unwrap();
 
     let event_files = ctx.get_event_files().unwrap();
-    let content = fs::read_to_string(&event_files[0]).unwrap();
+    let content = event_files
+        .iter()
+        .map(|file| fs::read_to_string(file).unwrap())
+        .collect::<String>();
     let lines: Vec<&str> = content.lines().collect();
     assert_eq!(lines.len(), 2);
 
     let delete_event: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
     assert_eq!(delete_event["op"], "delete_stream");
     assert_eq!(delete_event["id"], id);
+}
+
+fn seed(ctx: &SpoolContext, op: Operation, id: &str, d: serde_json::Value) {
+    write_event(
+        ctx,
+        &Event {
+            v: 1,
+            op,
+            id: id.into(),
+            ts: chrono::Utc::now(),
+            by: "@tester".into(),
+            branch: "main".into(),
+            d,
+        },
+    )
+    .unwrap();
 }

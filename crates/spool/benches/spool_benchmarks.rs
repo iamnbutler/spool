@@ -13,17 +13,14 @@ fn create_test_spool(num_tasks: usize) -> (TempDir, SpoolContext) {
     fs::create_dir_all(spool_dir.join("events")).unwrap();
     fs::create_dir_all(spool_dir.join("archive")).unwrap();
 
-    let ctx = SpoolContext {
-        root: spool_dir.clone(),
-        events_dir: spool_dir.join("events"),
-        archive_dir: spool_dir.join("archive"),
-    };
+    let ctx = SpoolContext::new(spool_dir);
 
     // Generate test events
     let event_file = ctx.events_dir.join("2026-01-01.jsonl");
     let file = OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&event_file)
         .unwrap();
     let mut writer = BufWriter::new(file);
@@ -131,6 +128,7 @@ fn bench_event_serialization(c: &mut Criterion) {
         comments: vec![],
         archived: None,
         stream: None,
+        claim: None,
     };
 
     group.bench_function("task_to_json", |b| {

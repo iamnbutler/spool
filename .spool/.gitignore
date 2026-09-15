@@ -10,3 +10,6 @@
 # Any temporary files from tooling
 *.tmp
 *.bak
+.lock
+.local/
+.tmp*
