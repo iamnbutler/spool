@@ -1,0 +1,1 @@
+{"v":1,"op":"comment","id":"mu2z6qke-qxxn","ts":"2026-09-15T19:11:05.967678Z","by":"codex:spool-reforge","branch":"codex/agent-coordination","d":{"body":"The standalone design note was removed during PR review. The retained coordination contract and usage guidance are in README.md and skills/spool.md.","ref":"README.md"}}

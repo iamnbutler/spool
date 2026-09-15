@@ -159,7 +159,7 @@ The first run imports existing events and updates the format marker to `0.5.0`. 
 - Run `spool sync` to export shared progress before committing.
 - Stop using older Spool binaries on the upgraded board; older writers do not participate in its coordination protocol.
 
-See [the design and acceptance contract](docs/agent-coordination.md) and [the short agent guide](skills/spool.md).
+See [the short agent guide](skills/spool.md) for the task workflow.
 
 ## Optional TUI
 
