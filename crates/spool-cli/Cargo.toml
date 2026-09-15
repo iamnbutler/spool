@@ -1,6 +1,6 @@
 [package]
 name = "spool-cli"
-version = "1.2.0"
+version = "2.0.0"
 edition = "2021"
 rust-version = "1.88"
 description = "CLI for spool - git-native task management"
@@ -15,7 +15,7 @@ name = "spool"
 path = "src/main.rs"
 
 [dependencies]
-spool = { version = "1.0.0", path = "../spool" }
+spool = { version = "2.0.0", path = "../spool" }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 
