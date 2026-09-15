@@ -31,6 +31,7 @@ fn test_cli_parse_list_defaults() {
         stream_name,
         no_stream,
         format,
+        ..
     } = cli.command
     {
         assert_eq!(status, "open");
@@ -229,7 +230,7 @@ fn test_output_format_clone() {
 fn test_cli_parse_complete_defaults() {
     let cli = Cli::parse_from(["spool", "complete", "task-123"]);
 
-    if let Commands::Complete { id, resolution } = cli.command {
+    if let Commands::Complete { id, resolution, .. } = cli.command {
         assert_eq!(id, "task-123");
         assert_eq!(resolution, "done");
     } else {
@@ -241,7 +242,7 @@ fn test_cli_parse_complete_defaults() {
 fn test_cli_parse_complete_with_resolution() {
     let cli = Cli::parse_from(["spool", "complete", "task-456", "--resolution", "wontfix"]);
 
-    if let Commands::Complete { id, resolution } = cli.command {
+    if let Commands::Complete { id, resolution, .. } = cli.command {
         assert_eq!(id, "task-456");
         assert_eq!(resolution, "wontfix");
     } else {
@@ -253,7 +254,7 @@ fn test_cli_parse_complete_with_resolution() {
 fn test_cli_parse_complete_short_flag() {
     let cli = Cli::parse_from(["spool", "complete", "task-789", "-r", "duplicate"]);
 
-    if let Commands::Complete { id, resolution } = cli.command {
+    if let Commands::Complete { id, resolution, .. } = cli.command {
         assert_eq!(id, "task-789");
         assert_eq!(resolution, "duplicate");
     } else {
@@ -281,7 +282,7 @@ fn test_cli_parse_update_with_title() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-123");
@@ -308,7 +309,7 @@ fn test_cli_parse_update_with_description() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-456");
@@ -329,7 +330,7 @@ fn test_cli_parse_update_with_priority() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-789");
@@ -360,7 +361,7 @@ fn test_cli_parse_update_all_fields() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-full");
@@ -391,7 +392,7 @@ fn test_cli_parse_update_short_flags() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-short");
@@ -412,7 +413,7 @@ fn test_cli_parse_update_no_options() {
         title,
         description,
         priority,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(id, "task-empty");
@@ -472,7 +473,7 @@ fn test_cli_parse_add_with_all_options() {
         priority,
         assignee,
         tag,
-        stream: _,
+        ..
     } = cli.command
     {
         assert_eq!(title, "Full task");

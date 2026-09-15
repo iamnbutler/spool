@@ -493,7 +493,8 @@ fn test_assign_task() {
         .args(["assign", "task-001", "@alice"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Assigned task task-001 to @alice"));
+        .stdout(predicate::str::contains("Assigned task: task-001"))
+        .stdout(predicate::str::contains("Assignee: @alice"));
 
     // Verify assignment
     spool_cmd()
@@ -528,10 +529,10 @@ fn test_claim_task() {
 
     spool_cmd()
         .current_dir(temp_dir.path())
-        .args(["claim", "task-001"])
+        .args(["claim", "task-001", "--agent", "test-agent"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Claimed task task-001"));
+        .stdout(predicate::str::contains("Claimed task: task-001"));
 }
 
 #[test]
@@ -541,7 +542,7 @@ fn test_claim_task_not_found() {
 
     spool_cmd()
         .current_dir(temp_dir.path())
-        .args(["claim", "nonexistent"])
+        .args(["claim", "nonexistent", "--agent", "test-agent"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("not found"));
@@ -561,7 +562,7 @@ fn test_free_task() {
         .args(["free", "task-001"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Freed task task-001"));
+        .stdout(predicate::str::contains("Freed task: task-001"));
 }
 
 #[test]
@@ -675,14 +676,14 @@ fn test_stream_add_and_list() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Created stream:"))
-        .stdout(predicate::str::contains("My Stream"));
+        .stdout(predicate::str::contains("my stream"));
 
     spool_cmd()
         .current_dir(temp_dir.path())
         .args(["stream", "list"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("My Stream"));
+        .stdout(predicate::str::contains("my stream"));
 }
 
 #[test]
@@ -751,7 +752,7 @@ fn test_stream_update() {
         .args(["stream", "show", "--name", "New Name"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("New Name"));
+        .stdout(predicate::str::contains("new name"));
 }
 
 #[test]
@@ -943,5 +944,5 @@ fn test_stream_list_json_format() {
         .assert()
         .success()
         .stdout(predicate::str::contains("\"name\":"))
-        .stdout(predicate::str::contains("JSON Stream"));
+        .stdout(predicate::str::contains("json stream"));
 }

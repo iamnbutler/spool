@@ -1,231 +1,236 @@
 use anyhow::{anyhow, Result};
-use chrono::DateTime;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
+use std::fs;
 
+use crate::concurrency::FileLock;
 use crate::context::SpoolContext;
-use crate::state::materialize;
+use crate::event::{Event, Operation};
 
-#[derive(Debug)]
+#[derive(Debug, Default, Serialize)]
 pub struct ValidationResult {
     pub errors: Vec<String>,
     pub warnings: Vec<String>,
 }
 
-pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
-    let mut errors = Vec::new();
-    let mut warnings = Vec::new();
-    let mut created_ids: HashSet<String> = HashSet::new();
-
-    // Validate event files
-    for file in ctx.get_event_files()? {
-        let filename = file
-            .file_name()
-            .ok_or_else(|| {
-                anyhow::anyhow!("event file path has no filename component: {:?}", file)
-            })?
-            .to_string_lossy()
-            .to_string();
-        validate_event_file(
-            &file,
-            &filename,
-            &mut errors,
-            &mut warnings,
-            &mut created_ids,
-        )?;
-    }
-
-    // Validate archive files
-    for file in ctx.get_archive_files()? {
-        let filename = file
-            .file_name()
-            .ok_or_else(|| {
-                anyhow::anyhow!("archive file path has no filename component: {:?}", file)
-            })?
-            .to_string_lossy()
-            .to_string();
-        validate_event_file(
-            &file,
-            &filename,
-            &mut errors,
-            &mut warnings,
-            &mut created_ids,
-        )?;
-    }
-
-    // Only check for orphaned references if no errors occurred
-    // (materialize will fail on invalid events)
-    if errors.is_empty() {
-        let state = materialize(ctx)?;
-        for task in state.tasks.values() {
-            for blocked_by in &task.blocked_by {
-                if !state.tasks.contains_key(blocked_by) {
-                    warnings.push(format!(
-                        "Task {} references non-existent blocked_by: {}",
-                        task.id, blocked_by
-                    ));
+pub fn inspect(ctx: &SpoolContext) -> Result<ValidationResult> {
+    let _lock = FileLock::acquire(ctx)?;
+    let mut result = ValidationResult::default();
+    let mut files = ctx.get_archive_files()?;
+    files.extend(ctx.get_event_files()?);
+    files.extend(ctx.get_local_event_files()?);
+    let mut creates = HashMap::new();
+    let mut events = Vec::new();
+    let mut seen = HashSet::new();
+    for file in files {
+        for (line, content) in fs::read_to_string(&file)?.lines().enumerate() {
+            if content.trim().is_empty() {
+                continue;
+            }
+            let location = format!("{}:{}", file.display(), line + 1);
+            let value: serde_json::Value = match serde_json::from_str(content) {
+                Ok(value) => value,
+                Err(error) => {
+                    result
+                        .errors
+                        .push(format!("{location}: Invalid JSON: {error}"));
+                    continue;
+                }
+            };
+            let mut invalid = false;
+            for field in ["v", "op", "id", "ts", "by", "branch", "d"] {
+                if value.get(field).is_none() {
+                    result
+                        .errors
+                        .push(format!("{location}: Missing required field '{field}'"));
+                    invalid = true;
                 }
             }
-            for blocks in &task.blocks {
-                if !state.tasks.contains_key(blocks) {
-                    warnings.push(format!(
-                        "Task {} references non-existent blocks: {}",
-                        task.id, blocks
-                    ));
+            if invalid {
+                continue;
+            }
+            if value.get("v").and_then(|value| value.as_u64()) != Some(1) {
+                result.errors.push(format!(
+                    "{location}: Unsupported schema version {}",
+                    value["v"]
+                ));
+                continue;
+            }
+            if value["ts"]
+                .as_str()
+                .map(|value| chrono::DateTime::parse_from_rfc3339(value).is_err())
+                .unwrap_or(true)
+            {
+                result
+                    .errors
+                    .push(format!("{location}: Invalid timestamp format"));
+                continue;
+            }
+            let event: Event = match serde_json::from_value(value) {
+                Ok(event) => event,
+                Err(error) => {
+                    result
+                        .errors
+                        .push(format!("{location}: Invalid event: {error}"));
+                    continue;
+                }
+            };
+            if !event.d.is_object() {
+                result
+                    .errors
+                    .push(format!("{location}: Event payload must be an object"));
+                continue;
+            }
+            let hash = crate::store::fingerprint(&event)?;
+            if !seen.insert(hash.clone()) {
+                continue;
+            }
+            if matches!(event.op, Operation::Create | Operation::CreateStream)
+                && creates.insert(event.id.clone(), event.ts).is_some()
+            {
+                result
+                    .warnings
+                    .push(format!("{location}: Duplicate create for {}", event.id));
+            }
+            for field in ["title", "name", "body"] {
+                if event.d.get(field).is_some_and(|value| {
+                    value
+                        .as_str()
+                        .map(|value| value.trim().is_empty())
+                        .unwrap_or(true)
+                }) {
+                    result.errors.push(format!("{location}: Invalid {field}"));
                 }
             }
-            if let Some(parent) = &task.parent {
-                if !state.tasks.contains_key(parent) {
-                    warnings.push(format!(
-                        "Task {} references non-existent parent: {}",
-                        task.id, parent
-                    ));
+            if event.op == Operation::Create
+                && event
+                    .d
+                    .get("title")
+                    .and_then(|value| value.as_str())
+                    .is_none()
+            {
+                result
+                    .errors
+                    .push(format!("{location}: Create requires a title"));
+            }
+            if event
+                .d
+                .get("priority")
+                .is_some_and(|value| !matches!(value.as_str(), Some("p0" | "p1" | "p2" | "p3")))
+            {
+                result
+                    .warnings
+                    .push(format!("{location}: Unknown priority"));
+            }
+            events.push((event, location));
+        }
+    }
+    for (event, location) in &events {
+        if !matches!(event.op, Operation::Create | Operation::CreateStream)
+            && creates
+                .get(&event.id)
+                .map(|created| *created > event.ts)
+                .unwrap_or(true)
+        {
+            result
+                .warnings
+                .push(format!("{location}: Event for {} before create", event.id));
+        }
+    }
+    if result.errors.is_empty() {
+        match crate::state::materialize(ctx) {
+            Err(error) => result
+                .errors
+                .push(format!("Cannot replay history: {error:#}")),
+            Ok(state) => {
+                for task in state.tasks.values() {
+                    for id in crate::engine::dependencies(&state, task) {
+                        if !state.tasks.contains_key(&id) {
+                            result.warnings.push(format!(
+                                "Task {} references non-existent blocked_by: {id}",
+                                task.id
+                            ));
+                        }
+                    }
+                    for id in &task.blocks {
+                        if !state.tasks.contains_key(id) {
+                            result.warnings.push(format!(
+                                "Task {} references non-existent blocks: {id}",
+                                task.id
+                            ));
+                        }
+                    }
+                    if let Some(parent) = &task.parent {
+                        if !state.tasks.contains_key(parent) {
+                            result.warnings.push(format!(
+                                "Task {} references non-existent parent: {parent}",
+                                task.id
+                            ));
+                        }
+                    }
+                    if let Some(stream) = &task.stream {
+                        if !state.streams.contains_key(stream) && task.archived.is_none() {
+                            result.warnings.push(format!(
+                                "Task {} references non-existent stream: {stream}",
+                                task.id
+                            ));
+                        }
+                    }
+                    if dependency_cycle(&state, &task.id) {
+                        result
+                            .errors
+                            .push(format!("Dependency cycle involving {}", task.id));
+                    }
                 }
             }
         }
     }
-
-    let result = ValidationResult { errors, warnings };
-
-    // Print results
-    if result.errors.is_empty() && result.warnings.is_empty() {
-        println!("Validation passed. No issues found.");
-    } else {
-        if !result.errors.is_empty() {
-            println!("Errors ({}):", result.errors.len());
-            for error in &result.errors {
-                println!("  ERROR: {}", error);
-            }
-        }
-        if !result.warnings.is_empty() {
-            println!("Warnings ({}):", result.warnings.len());
-            for warning in &result.warnings {
-                println!("  WARN: {}", warning);
-            }
-        }
-
-        if strict && !result.errors.is_empty() {
-            return Err(anyhow!(
-                "Validation failed with {} errors",
-                result.errors.len()
-            ));
-        }
-        if strict && !result.warnings.is_empty() {
-            return Err(anyhow!(
-                "Validation failed with {} warnings (--strict mode)",
-                result.warnings.len()
-            ));
-        }
-    }
-
+    result.errors.sort();
+    result.warnings.sort();
     Ok(result)
 }
 
-fn validate_event_file(
-    path: &Path,
-    filename: &str,
-    errors: &mut Vec<String>,
-    warnings: &mut Vec<String>,
-    created_ids: &mut HashSet<String>,
-) -> Result<()> {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(e) => {
-            errors.push(format!("Cannot open {}: {}", filename, e));
-            return Ok(());
+fn dependency_cycle(state: &crate::state::State, start: &str) -> bool {
+    let mut pending = crate::engine::dependencies(state, &state.tasks[start]);
+    let mut seen = HashSet::new();
+    while let Some(id) = pending.pop() {
+        if id == start {
+            return true;
         }
-    };
-    let reader = BufReader::new(file);
-
-    for (line_num, line) in reader.lines().enumerate() {
-        let line = match line {
-            Ok(l) => l,
-            Err(e) => {
-                errors.push(format!("{}:{}: Read error: {}", filename, line_num + 1, e));
-                continue;
-            }
-        };
-
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let event: serde_json::Value = match serde_json::from_str(&line) {
-            Ok(v) => v,
-            Err(e) => {
-                errors.push(format!(
-                    "{}:{}: Invalid JSON: {}",
-                    filename,
-                    line_num + 1,
-                    e
-                ));
-                continue;
-            }
-        };
-
-        // Check required fields
-        let required = ["v", "op", "id", "ts", "by", "branch", "d"];
-        for field in required {
-            if event.get(field).is_none() {
-                errors.push(format!(
-                    "{}:{}: Missing required field '{}'",
-                    filename,
-                    line_num + 1,
-                    field
-                ));
-            }
-        }
-
-        // Check schema version
-        if let Some(v) = event.get("v").and_then(|v| v.as_u64()) {
-            if v != 1 {
-                warnings.push(format!(
-                    "{}:{}: Unknown schema version {}",
-                    filename,
-                    line_num + 1,
-                    v
-                ));
-            }
-        }
-
-        // Track creates for orphan detection
-        if let Some(op) = event.get("op").and_then(|v| v.as_str()) {
-            if let Some(id) = event.get("id").and_then(|v| v.as_str()) {
-                if op == "create" {
-                    if created_ids.contains(id) {
-                        warnings.push(format!(
-                            "{}:{}: Duplicate create for task {}",
-                            filename,
-                            line_num + 1,
-                            id
-                        ));
-                    }
-                    created_ids.insert(id.to_string());
-                } else if !created_ids.contains(id) {
-                    warnings.push(format!(
-                        "{}:{}: Event for task {} before create",
-                        filename,
-                        line_num + 1,
-                        id
-                    ));
-                }
-            }
-        }
-
-        // Validate timestamp format
-        if let Some(ts) = event.get("ts").and_then(|v| v.as_str()) {
-            if DateTime::parse_from_rfc3339(ts).is_err() {
-                errors.push(format!(
-                    "{}:{}: Invalid timestamp format: {}",
-                    filename,
-                    line_num + 1,
-                    ts
-                ));
+        if seen.insert(id.clone()) {
+            if let Some(task) = state.tasks.get(&id) {
+                pending.extend(crate::engine::dependencies(state, task));
             }
         }
     }
+    false
+}
 
-    Ok(())
+/// Compatibility wrapper for library/TUI callers. The CLI always exits nonzero
+/// for errors; strict also makes warnings fail.
+pub fn validate(ctx: &SpoolContext, strict: bool) -> Result<ValidationResult> {
+    let result = inspect(ctx)?;
+    if result.errors.is_empty() && result.warnings.is_empty() {
+        println!("Validation passed. No issues found.");
+    } else {
+        for error in &result.errors {
+            println!("ERROR: {error}");
+        }
+        for warning in &result.warnings {
+            println!("WARN: {warning}");
+        }
+    }
+    if strict && !result.errors.is_empty() {
+        return Err(anyhow!(
+            "Validation failed with {} errors",
+            result.errors.len()
+        ));
+    }
+    if strict && !result.warnings.is_empty() {
+        return Err(anyhow!(
+            "Validation failed with {} warnings",
+            result.warnings.len()
+        ));
+    }
+    Ok(result)
 }

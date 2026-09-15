@@ -4,14 +4,14 @@ Thank you for your interest in contributing to Spool!
 
 ## Development Setup
 
-1. **Install Rust** (1.70.0 or later)
+1. **Install Rust** (1.88.0 or later)
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 2. **Clone and build**
    ```bash
-   git clone https://github.com/your-username/spool.git
+   git clone https://github.com/iamnbutler/spool.git
    cd spool
    cargo build
    ```
@@ -36,8 +36,9 @@ We aim for high test coverage. When adding features:
 3. **Run the full suite** before submitting:
    ```bash
    cargo test
-   cargo clippy -- -D warnings
+   cargo clippy --workspace --all-targets -- -D warnings
    cargo fmt --check
+   cargo +1.88 check --workspace --locked
    ```
 
 ## Pull Request Process
@@ -50,11 +51,15 @@ We aim for high test coverage. When adding features:
 
 ## Event Schema
 
-When modifying the event schema (`src/event.rs`):
+When modifying the event schema (`crates/spool/src/event.rs`):
 
 - Event schema v1 is **frozen** - existing events must remain valid
 - New operations can be added but existing ones cannot change
 - Add tests for any schema changes
+
+## Agent coordination
+
+Use the checkout's CLI and follow [the agent workflow](skills/spool.md). Every mutation must validate and publish under the board lock through `engine::commit`; the TUI must use the same guarded writer path. Add process/worktree regression coverage for coordination changes. Run `spool sync` before committing task history.
 
 ## Questions?
 

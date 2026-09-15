@@ -1,7 +1,5 @@
 use anyhow::Result;
 use chrono::Utc;
-use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
 
 use crate::context::SpoolContext;
 use crate::event::{Event, Operation};
@@ -18,21 +16,9 @@ pub struct CreateTaskParams<'a> {
     pub stream: Option<&'a str>,
 }
 
-/// Write an event to the current day's event file
+/// Validate and publish an event under the board's transaction lock.
 pub fn write_event(ctx: &SpoolContext, event: &Event) -> Result<()> {
-    let today = Utc::now().format("%Y-%m-%d").to_string();
-    let event_file = ctx.events_dir.join(format!("{}.jsonl", today));
-
-    let file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&event_file)?;
-    let mut writer = BufWriter::new(file);
-
-    let json = serde_json::to_string(event)?;
-    writeln!(writer, "{}", json)?;
-    writer.flush()?;
-
+    crate::engine::commit(ctx, event.clone(), None)?;
     Ok(())
 }
 
@@ -95,7 +81,7 @@ pub fn get_current_branch() -> Result<String> {
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
-        Ok("main".to_string())
+        Ok("unknown".to_string())
     }
 }
 
@@ -233,6 +219,10 @@ pub fn set_stream(
 
 /// Get the current user (from git config or environment)
 pub fn get_current_user() -> Result<String> {
+    Ok(crate::engine::Identity::resolve(None)?.agent)
+}
+
+pub(crate) fn get_human_user() -> Result<String> {
     // Try git config first
     let output = std::process::Command::new("git")
         .args(["config", "user.name"])

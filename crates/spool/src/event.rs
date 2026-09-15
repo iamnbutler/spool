@@ -26,6 +26,11 @@ pub enum Operation {
     Reopen,
     Archive,
     SetStream,
+    // Local work leases (never exported to Git)
+    Claim,
+    Renew,
+    // Durable transfer of ownership and context
+    Handoff,
     // Stream operations
     CreateStream,
     UpdateStream,
@@ -45,9 +50,18 @@ impl std::fmt::Display for Operation {
             Operation::Reopen => write!(f, "reopen"),
             Operation::Archive => write!(f, "archive"),
             Operation::SetStream => write!(f, "set_stream"),
+            Operation::Claim => write!(f, "claim"),
+            Operation::Renew => write!(f, "renew"),
+            Operation::Handoff => write!(f, "handoff"),
             Operation::CreateStream => write!(f, "create_stream"),
             Operation::UpdateStream => write!(f, "update_stream"),
             Operation::DeleteStream => write!(f, "delete_stream"),
         }
+    }
+}
+
+impl Event {
+    pub fn is_local(&self) -> bool {
+        matches!(self.op, Operation::Claim | Operation::Renew)
     }
 }

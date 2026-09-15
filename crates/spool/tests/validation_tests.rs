@@ -159,11 +159,11 @@ fn test_validation_unknown_schema_version() {
     let ctx = create_test_context(&spool_dir);
     let result = spool::validation::validate(&ctx, false).unwrap();
 
-    assert!(!result.warnings.is_empty());
+    assert!(!result.errors.is_empty());
     assert!(result
-        .warnings
+        .errors
         .iter()
-        .any(|w| w.contains("Unknown schema version")));
+        .any(|w| w.contains("Unsupported schema version")));
 }
 
 #[test]
@@ -290,7 +290,7 @@ fn test_validation_empty_lines_ignored() {
         "2024-01-15.jsonl",
         &[
             "",
-            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{}}"#,
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"tester","branch":"main","d":{"title":"Test"}}"#,
             "   ",
             "",
         ],

@@ -1,235 +1,177 @@
 # Spool
 
-Git-native, event-sourced task management.
+A shared task board for coding agents. Plan work in streams, claim a ready task, keep notes, and hand it off with enough context for the next agent to continue.
 
-```bash
-cargo install spool-cli     # CLI
-cargo install spool-ui      # TUI (optional)
+Agents in the same repository's Git worktrees share a live board. Claims are atomic, expire when abandoned, and carry a token that prevents a stale worker from changing reclaimed work. Durable task history travels with Git. [Telephone](https://nate.rip/telephone/) provides agent discovery and messaging.
+
+## Try this branch
+
+Requires Rust 1.88+ and Git 2.31+.
+
+```sh
+cargo build --release -p spool-cli
+export PATH="$PWD/target/release:$PATH"
+spool prime
 ```
 
-Tasks are stored as append-only event logs in `.spool/events/`. Every change is tracked, branches work naturally, and merge conflicts resolve automatically.
+This collaboration workflow is unreleased; build from this checkout. To install this checkout's binary permanently, use `cargo install --path crates/spool-cli --locked`. All participating agents should use the same version.
 
-## TUI
+## The work loop
 
-Run `spool-ui` for a terminal interface. Press `?` for all shortcuts.
+Initialize once at the repository root and give each agent session a unique identity:
 
-**Navigation**
-- `j/k` or `↑/↓` — Move up/down
-- `g/G` — Jump to first/last
-- `[/]` or `Option+←/→` — Switch view
-- `Tab` — Toggle detail panel
-- `Enter` — Show detail / select
-
-**Tasks**
-- `n` — New task
-- `c` — Complete task
-- `r` — Reopen task
-- `v` — Cycle status (Open/Complete/All)
-- `o` — Cycle sort order
-- `/` — Search
-
-**Streams**
-- `s` — Streams view
-- `n` — New stream (in streams view)
-- `d` — Delete stream (in streams view)
-
-**General**
-- `h` — History view
-- `?` — Show shortcuts
-- `q` — Quit
-- `Esc` — Back / quit
-
-## Usage
-
-### Initialize
-
-```bash
-cd your-project
+```sh
 spool init
+export SPOOL_AGENT=api-worker-1
 ```
 
-Creates `.spool/` with `events/` and `archive/` directories. Commit this to git.
+Identity precedence is `--agent`, `SPOOL_AGENT`, `TELEPHONE_ADDR`, then the Git user for ordinary human edits. Claiming and renewing work require an explicit session identity. Multiple agents must not share the same session identity.
 
-### Create tasks
-
-```bash
-spool add "Implement authentication"
-spool add "Fix login bug" -p p0 -t bug -d "Users getting logged out unexpectedly"
-spool add "Backend API" -p p1 -t feature -a @alice --stream <stream-id>
+```sh
+spool ready --json
+spool next --json
 ```
 
-Options: `-p` priority (p0-p3), `-t` tag (repeatable), `-d` description, `-a` assignee, `--stream` stream ID.
+`next` selects and claims the highest-priority available task in one transaction. Its response includes the task's description, notes, prerequisites, and `claim.token`. It returns JSON `null` when no work is available. Use `claim <id>` to choose a task explicitly.
 
-### List tasks
+Keep the returned token for that task:
 
-```bash
-spool list                          # Open tasks (default)
-spool list -s all                   # All tasks
-spool list -s complete              # Completed only
-spool list -a @alice                # By assignee
-spool list -p p0 -t bug             # By priority and tag
-spool list --stream <id>            # By stream
-spool list --no-stream              # Tasks without a stream
-spool list -f json                  # JSON output
-spool list -f ids                   # IDs only (for scripting)
+```sh
+spool show <id> --json
+spool renew <id> --token <token>
+spool comment <id> 'Parser implemented; checking Unicode boundaries' --ref src/parser.rs
+spool complete <id> --token <token> --note 'Implemented and verified with parser tests'
 ```
 
-### Show task details
+The default lease is 15 minutes. Renew before it expires; `--lease-seconds 3600` requests an hour. Durations range from 1 second to 24 hours. A current token and matching identity are required to change a claimed task. Notes can be added by any collaborator.
 
-```bash
-spool show <task-id>
-spool show <task-id> --events       # Include event history
+When pausing, leave a useful resumption point:
+
+```sh
+spool release <id> --token <token> --note 'Implementation is on branch parser; Unicode test still fails'
 ```
 
-### Update tasks
+`release` clears the assignment and lease. Once a lease expires, any collaborator can release the abandoned task without a token and record a recovery note, even if prerequisites prevent reclaiming it. An expired lease can be reclaimed by another agent, including when the original worker had a reservation. Every fresh claim gets a new token. An old token cannot renew, complete, release, or edit a subsequent claim, even if the agent identity is reused.
 
-```bash
-spool update <id> -t "New title"
-spool update <id> -d "New description"
-spool update <id> -p p1
-spool update <id> --stream <stream-id>
+## Plan work
+
+Streams group related tasks into a project or epic. Put scope, acceptance criteria, file ownership, and expected output in the description.
+
+```sh
+spool stream add parser -d 'Ship the new parser'
+spool add 'Define the grammar' --stream parser -p p1 -d 'Document accepted syntax and error cases'
+spool add 'Implement parsing' --stream parser -p p1 -t rust
+spool block <implementation-id> --by <grammar-id>
 ```
 
-### Assign tasks
+A task is ready when it is open, has no live claim, all prerequisites are complete, and any pending assignment matches the requesting agent. Missing prerequisites keep it blocked. Cycles and self-dependencies are rejected. Completing a prerequisite makes its dependents eligible; it never completes them automatically. Any completion resolution resolves a prerequisite. Marking a task `done` requires its prerequisites to be complete; cancellation resolutions can close blocked work.
 
-```bash
-spool assign <id> @alice            # Assign to user
-spool claim <id>                    # Assign to yourself
-spool free <id>                     # Unassign
+```sh
+spool unblock <id> --by <prerequisite>
+spool assign <id> api-worker-1        # reserve future work
+spool free <id>                      # clear a reservation
+spool update <id> -d 'Revised acceptance criteria' --add-tag reviewed
+spool update <id> --stream parser
+spool update <id> --stream ''         # remove from a stream
+spool reopen <id>
+spool complete <id> -r wontfix
 ```
 
-### Complete tasks
+Priorities are `p0` through `p3`, with `p2` as the default. Streams accept IDs or names; new and renamed stream names are trimmed and lowercased. Task commands accept an unambiguous ID prefix. `link` / `unlink` also support `blocks`, `blocked_by`, and `parent` relationships.
 
-```bash
-spool complete <id>                 # Default resolution: done
-spool complete <id> -r wontfix      # Other: duplicate, obsolete
-spool reopen <id>                   # Reopen completed task
+## Find context quickly
+
+```sh
+spool status --json
+spool list --mine --json
+spool list --stream parser --limit 20 --json
+spool list --status blocked --json
+spool list --status in_progress --json
+spool list --search Unicode --tag rust --json
+spool ready --stream parser --limit 10 --json
+spool next --stream parser --tag rust --json
+spool show <id> --events --json
+spool stream show parser --json
 ```
 
-### Streams
+Task status remains `open` or `complete`. `work_status` describes the current view: `open`, `blocked`, `in_progress`, or `complete`. `ready` is relative to the requesting agent. `assignee` is a reservation; `claim` identifies the active worker and its lease.
 
-Streams group tasks into collections (features, sprints, areas).
-
-```bash
-spool stream add "api" -d "Backend API work"
-spool stream list
-spool stream show <id>
-spool stream show --name "api"
-spool stream update <id> -n "new-name" -d "New description"
-spool stream delete <id>            # Must have no tasks
-```
-
-### Maintenance
-
-```bash
-spool rebuild                       # Regenerate caches from events
-spool archive --days 30             # Archive old completed tasks
-spool archive --dry-run             # Preview what would be archived
-spool validate                      # Check event file integrity
-spool validate --strict             # Fail on warnings too
-```
-
-## How it works
-
-### Event sourcing
-
-Instead of mutable records, every change is an immutable event:
+`--json` works on every command. Successful commands write one JSON value to stdout; errors write a JSON object to stderr:
 
 ```json
-{"v":1,"op":"create","id":"k8b2x-a1c3","ts":"2026-01-13T12:00:00Z","by":"@alice","branch":"main","d":{"title":"Fix bug"}}
-{"v":1,"op":"assign","id":"k8b2x-a1c3","ts":"2026-01-13T12:01:00Z","by":"@bob","branch":"main","d":{"to":"@bob"}}
-{"v":1,"op":"complete","id":"k8b2x-a1c3","ts":"2026-01-13T14:00:00Z","by":"@bob","branch":"main","d":{"resolution":"done"}}
+{"error":{"code":"claim_conflict","message":"Task … is claimed by another agent"}}
 ```
 
-Events are stored in daily JSONL files: `.spool/events/2026-01-13.jsonl`
+Exit codes are `0` for success (including an empty queue), `1` for task/data/I/O errors, and `2` for claim conflicts, expired/stale claims, a busy board, or argument errors. Use `error.code` to distinguish cases. List responses omit descriptions and notes; `show`, `claim`, and `next` return full task context. Existing `list -f json` and `-f ids` remain available. Reads always replay the current event log, so no rebuild hook is needed after edits or Git operations.
 
-State is materialized by replaying events. Caches (`.index.json`, `.state.json`) are gitignored and rebuilt on demand with `spool rebuild`.
+## Pair with Telephone
 
-### Directory structure
+Use a real per-session address from Telephone as `TELEPHONE_ADDR`, or pass it to Spool with `--agent`. For a polling runtime, Telephone can create the address:
 
-```
-.spool/
-├── events/           # Daily event logs (committed)
-│   └── 2026-01-13.jsonl
-├── archive/          # Monthly archives (committed)
-│   └── 2026-01.jsonl
-├── .index.json       # Cache (gitignored)
-├── .state.json       # Cache (gitignored)
-└── .gitignore
+```sh
+export TELEPHONE_ADDR="$(telephone register --runtime generic --name parser-worker)"
+spool whoami --json
+telephone list
 ```
 
-### Operations
+A handoff saves the recipient, note, and optional reference together, and releases the current claim:
 
-| Operation | Description |
-|-----------|-------------|
-| `create` | Create task with title, description, priority, assignee, tags |
-| `update` | Update task fields |
-| `assign` | Change assignee (null to unassign) |
-| `complete` | Mark complete with resolution |
-| `reopen` | Reopen completed task |
-| `comment` | Add comment |
-| `link` / `unlink` | Manage relationships (blocks, blocked_by, parent) |
-| `set_stream` | Set or remove task's stream |
-| `create_stream` | Create stream |
-| `update_stream` | Update stream metadata |
-| `delete_stream` | Delete stream |
-| `archive` | Archive completed task |
-
-### Task IDs
-
-Format: `{timestamp}-{random}` where timestamp is Unix ms in base36 and random is 4 alphanumeric chars.
-
-Example: `k8b2x-a1c3`
-
-## Git integration
-
-### Commit with code
-
-```bash
-git add src/feature.rs .spool/events/
-git commit -m "Implement feature and update task"
+```sh
+spool handoff <id> --to <recipient-address> --token <token> \
+  --note 'Review branch parser. Focus on error recovery; tests pass.' \
+  --ref <pull-request-url> --json
 ```
 
-### Post-merge hook
+The response includes `notification.to` and `notification.message`. Send that payload with Telephone when you want to notify the recipient:
 
-```bash
-#!/bin/sh
-# .git/hooks/post-merge
-spool rebuild
+```sh
+# handoff.json contains the JSON returned above.
+telephone send "$(jq -r '.notification.to' handoff.json)" \
+  "$(jq -r '.notification.message' handoff.json)"
 ```
 
-### Merge conflicts
+Spool saves the handoff without invoking Telephone. The recipient reads the task, then claims it using the assigned address as its Spool identity (`--agent` can override a different `SPOOL_AGENT`). If delivery is delayed or uncertain, the assignment and context remain discoverable through `spool list --mine` and `show`. Follow Telephone's delivery report; successful sending is not a read receipt. Spool also works with human assignees and agents that have no Telephone address.
 
-Event files are append-only. On conflict, keep both sets of events:
+## Git and worktrees
 
-```bash
-# Keep all events from both versions, then:
-spool validate
-spool rebuild
+Inside a Git repository, the live board is in `<git-common-dir>/spool`. All linked worktrees use that directory, including worktrees created before initialization. Switching code branches does not roll back the live board. `spool status` shows the exact board and checkout paths.
+
+Each command imports durable events found in its checkout's `.spool`. Export the shared board before committing:
+
+```sh
+spool sync
+spool validate --strict
+git add .spool
+git commit -m 'Record task progress'
 ```
 
-### CI validation
+`sync` exports the whole shared board, including work recorded in other worktrees. It writes missing immutable events into this checkout's `.spool/events`; it does not create Git commits or push anything. Existing daily logs and archives stay readable and are never rewritten. Exact duplicate events replay once. New changes use separate content-addressed files so agents can add events on different branches without appending to the same file.
 
-```bash
-spool validate --strict || exit 1
+Claims and renewals live under `.local/events` in the live board. They survive process exits but are excluded from Git exports. A clone starts with task history and reservations, then establishes its own local claims. **Independent clones or machines do not share atomic claims.** This is a local collaboration tool, matching Telephone's same-machine scope. Use a local filesystem and one shared board for agents that need exclusive claims.
+
+Outside Git, Spool uses the nearest `.spool` directly, with local lease files gitignored. `spool archive` retains history while hiding old completed tasks; `reopen` makes an archived task visible again. `spool rebuild` remains available to write diagnostic snapshots; those snapshots are never used as authoritative reads.
+
+## Upgrading an existing board
+
+The first run imports existing events and updates the format marker to `0.5.0`. Existing tasks, streams, comments, and completion history remain available. The important workflow changes are:
+
+- Use a unique agent identity and keep claim tokens.
+- Run `spool sync` to export shared progress before committing.
+- Stop using older Spool binaries on the upgraded board; older writers do not participate in its coordination protocol.
+
+See [the design and acceptance contract](docs/agent-coordination.md) and [the short agent guide](skills/spool.md).
+
+## Optional TUI
+
+`cargo run -p spool-ui` opens the board. It shows active agents and lease expiry and watches shared task and lease events. The `a` action reserves a task for the current user. Active agent claims are protected from TUI edits; use the CLI with the current token for lease operations. Press `?` for shortcuts.
+
+## Development
+
+```sh
+cargo test --workspace --locked
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --check
+cargo +1.88 check --workspace --locked
 ```
 
-## Scripting
-
-```bash
-# Get task IDs
-TASKS=$(spool list -f ids)
-
-# Process JSON
-spool list -f json | jq '.[] | select(.priority == "p0")'
-
-# Batch operations
-for id in $(spool list -f ids -t bug); do
-  spool update $id -p p1
-done
-```
-
-## License
-
-MIT
-
+MIT licensed.

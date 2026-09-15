@@ -51,15 +51,20 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
     let (watcher_tx, watcher_rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(event) = res {
-            // Only trigger on modifications and creates (not removes or access)
-            if event.kind.is_modify() || event.kind.is_create() {
+            // Lease events live alongside durable events. Ignore lock/cache
+            // activity so a reload does not trigger another reload.
+            if (event.kind.is_modify() || event.kind.is_create() || event.kind.is_remove())
+                && event
+                    .paths
+                    .iter()
+                    .any(|path| path.extension().is_some_and(|ext| ext == "jsonl"))
+            {
                 let _ = watcher_tx.send(());
             }
         }
     })?;
 
-    // Watch the events directory
-    watcher.watch(app.events_dir(), RecursiveMode::NonRecursive)?;
+    watcher.watch(app.board_dir(), RecursiveMode::Recursive)?;
 
     // Poll timeout - balance between responsiveness and CPU usage
     let poll_timeout = Duration::from_millis(100);
@@ -71,7 +76,9 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
         if watcher_rx.try_recv().is_ok() {
             // Drain any additional pending events to avoid multiple reloads
             while watcher_rx.try_recv().is_ok() {}
-            let _ = app.reload_tasks();
+            if let Err(error) = app.reload_tasks() {
+                app.message = Some(format!("Reload failed: {error}"));
+            }
         }
 
         // Poll for keyboard events with timeout
@@ -244,10 +251,8 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                                     app.history_next();
                                 }
                             }
-                            KeyCode::BackTab => {
-                                if app.history_show_detail {
-                                    app.history_previous();
-                                }
+                            KeyCode::BackTab if app.history_show_detail => {
+                                app.history_previous();
                             }
                             _ => {}
                         },
@@ -309,7 +314,7 @@ fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, mut app: Ap
                             KeyCode::Char('r') => app.reopen_selected_task(),
                             KeyCode::Char('n') => app.start_new_task(),
                             KeyCode::Char('e') => app.show_task_edit_menu(),
-                            KeyCode::Char('a') => app.claim_selected_task(),
+                            KeyCode::Char('a') => app.assign_selected_task_to_me(),
                             KeyCode::Char('A') => app.start_assign_task(),
                             KeyCode::Char('u') => app.free_selected_task(),
                             KeyCode::Char('h') => app.toggle_history_view(),

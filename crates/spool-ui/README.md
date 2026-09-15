@@ -3,7 +3,7 @@
 Terminal UI for [spool](https://crates.io/crates/spool) - git-native task management.
 
 ```bash
-cargo install spool-ui
+cargo install --path crates/spool-ui --locked
 ```
 
 ## Usage
@@ -24,7 +24,8 @@ spool-ui
 | `g` / `G` | First / last task |
 | `Enter` | Toggle detail panel |
 | `Tab` | Switch focus (list/detail) |
-| `c` | Complete task |
+| `a` | Assign task to yourself |
+| `c` | Complete unclaimed task |
 | `r` | Reopen task |
 | `n` | New task |
 | `v` | Cycle view (Open/Complete/All) |
@@ -57,6 +58,8 @@ spool-ui
 - Search (title, description, tags)
 - Stream navigation
 - Inline task creation and completion
+
+Active agent leases are displayed alongside assignments. The TUI watches the shared board across worktrees and respects its claim guards. Use `spool renew`, `complete`, or `handoff` with the current claim token for work held by an agent. See [the agent workflow](../../README.md).
 
 ## License
 

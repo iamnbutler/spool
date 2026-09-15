@@ -222,13 +222,24 @@ fn draw_task_list(f: &mut Frame, area: Rect, app: &mut App) {
             let pstyle = priority_style(priority);
 
             let status_marker = match task.status {
+                spool::state::TaskStatus::Open
+                    if task
+                        .claim
+                        .as_ref()
+                        .is_some_and(|claim| claim.is_live(chrono::Utc::now())) =>
+                {
+                    "●"
+                }
                 spool::state::TaskStatus::Open => " ",
                 spool::state::TaskStatus::Complete => "✓",
             };
 
             let assignee = task
-                .assignee
-                .as_deref()
+                .claim
+                .as_ref()
+                .filter(|claim| claim.is_live(chrono::Utc::now()))
+                .map(|claim| claim.agent.as_str())
+                .or(task.assignee.as_deref())
                 .map(|a| format!(" {}", a))
                 .unwrap_or_default();
 
@@ -377,6 +388,25 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
                 Span::styled("Assignee: ", Style::default().fg(Color::DarkGray)),
                 Span::styled(assignee, Style::default().fg(Color::Cyan)),
             ]));
+        }
+
+        if let Some(claim) = &task.claim {
+            lines.push(Line::from(format!("Agent: {}", claim.agent)));
+            lines.push(Line::from(format!(
+                "Lease: {}{}",
+                claim.expires_at,
+                if claim.is_live(chrono::Utc::now()) {
+                    ""
+                } else {
+                    " (expired)"
+                }
+            )));
+        }
+        if !task.blocked_by.is_empty() {
+            lines.push(Line::from(format!(
+                "Prerequisites: {}",
+                task.blocked_by.join(", ")
+            )));
         }
 
         if !task.tags.is_empty() {
@@ -1015,7 +1045,7 @@ fn draw_help_overlay(f: &mut Frame) {
         Line::from("  e            Edit task"),
         Line::from("  c            Complete task"),
         Line::from("  r            Reopen task"),
-        Line::from("  a            Claim task"),
+        Line::from("  a            Assign task to me"),
         Line::from("  A            Assign to user"),
         Line::from("  u            Unassign task"),
         Line::from("  v            Cycle status filter"),
@@ -1153,7 +1183,7 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         InputMode::Normal if app.search_mode => (" Type to search  Enter/Esc:close", ""),
         InputMode::Normal => match app.view {
             View::Tasks => (
-                " n:new  e:edit  a:claim  c:complete  r:reopen",
+                " n:new  e:edit  a:assign  c:complete  r:reopen",
                 "::commands  ?:shortcuts",
             ),
             View::Streams => (
