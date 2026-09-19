@@ -573,10 +573,14 @@ fn run(cli: Cli) -> Result<Reply> {
                         && status_matches
                         && assignee
                             .as_deref()
-                            .map(|agent| {
-                                task.assignee.as_deref() == Some(agent)
+                            .map(|filter| {
+                                task.assignee
+                                    .as_deref()
+                                    .map(|a| assignee_eq(a, filter))
+                                    .unwrap_or(false)
                                     || task.claim.as_ref().is_some_and(|claim| {
-                                        claim.agent == agent && claim.is_live(Utc::now())
+                                        assignee_eq(&claim.agent, filter)
+                                            && claim.is_live(Utc::now())
                                     })
                             })
                             .unwrap_or(true)
@@ -958,6 +962,12 @@ fn optional(data: &mut Value, key: &str, value: Option<String>) {
     if let Some(value) = value {
         data[key] = json!(value);
     }
+}
+
+/// Compare two assignee/agent strings ignoring a leading `@`.
+/// `"@alice"` == `"alice"` == `"@alice"`.
+fn assignee_eq(a: &str, b: &str) -> bool {
+    a.trim_start_matches('@') == b.trim_start_matches('@')
 }
 
 fn belongs_to(task: &Task, agent: &str) -> bool {
