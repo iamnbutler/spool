@@ -519,6 +519,40 @@ fn test_assign_task_not_found() {
 }
 
 #[test]
+fn test_list_filter_assignee_at_prefix_agnostic() {
+    // "--assignee alice" and "--assignee @alice" should both find tasks
+    // assigned to "@alice" or "alice" — the filter ignores the leading @.
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Assigned task","assignee":"@alice"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Unassigned task"}}"#,
+        ),
+    );
+
+    // Filter without @ finds task stored with @
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // Filter with @ also finds task stored with @
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+}
+
+#[test]
 fn test_claim_task() {
     let temp_dir = TempDir::new().unwrap();
     setup_initialized_spool(&temp_dir);
