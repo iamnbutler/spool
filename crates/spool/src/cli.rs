@@ -144,7 +144,7 @@ pub enum Commands {
         #[arg(short, long)]
         tag: Option<String>,
         /// Filter by priority
-        #[arg(short, long)]
+        #[arg(short, long, value_parser = ["p0", "p1", "p2", "p3"])]
         priority: Option<String>,
         /// Filter by stream ID
         #[arg(long, conflicts_with = "stream_name")]
@@ -590,7 +590,12 @@ fn run(cli: Cli) -> Result<Reply> {
                             .unwrap_or(true)
                         && priority
                             .as_deref()
-                            .map(|priority| task.priority.as_deref().unwrap_or("p2") == priority)
+                            .map(|priority| {
+                                task.priority
+                                    .as_deref()
+                                    .unwrap_or("p2")
+                                    .eq_ignore_ascii_case(priority)
+                            })
                             .unwrap_or(true)
                         && selected
                             .as_deref()
