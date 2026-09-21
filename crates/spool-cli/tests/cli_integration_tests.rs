@@ -946,3 +946,54 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_list_complete_shows_completion_columns() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-done","ts":"2024-03-10T09:00:00Z","by":"@dev","branch":"main","d":{"title":"Finished work","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-done","ts":"2024-03-15T17:00:00Z","by":"@dev","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "complete"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-done"))
+        .stdout(predicate::str::contains("COMPLETED"))
+        .stdout(predicate::str::contains("RESOLUTION"))
+        .stdout(predicate::str::contains("2024-03-15"))
+        .stdout(predicate::str::contains("done"))
+        .stdout(predicate::str::contains("Finished work"))
+        // Standard open-task columns must not appear as header
+        .stdout(predicate::str::contains("ASSIGNEE / AGENT").not());
+}
+
+#[test]
+fn test_list_open_shows_standard_columns() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-open","ts":"2024-03-10T09:00:00Z","by":"@dev","branch":"main","d":{"title":"Open work","priority":"p2","assignee":"@alice"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "open"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-open"))
+        .stdout(predicate::str::contains("ASSIGNEE / AGENT"))
+        .stdout(predicate::str::contains("STATUS"))
+        .stdout(predicate::str::contains("Open work"))
+        // Completion columns must not appear for open tasks
+        .stdout(predicate::str::contains("COMPLETED").not())
+        .stdout(predicate::str::contains("RESOLUTION").not());
+}

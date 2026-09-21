@@ -515,7 +515,7 @@ fn run(cli: Cli) -> Result<Reply> {
                 "ready": ready, "blocked": blocked, "in_progress": active, "complete": complete,
                 "mine": mine.iter().map(|task| engine::view(&state, task, &identity.agent, false)).collect::<Vec<_>>()});
             Ok(Reply::new(value, format!("{}\nBoard: {}\n{ready} ready for you · {active} in progress · {blocked} blocked · {complete} complete\n{}",
-                identity.agent, ctx.root.display(), table(&state, &mine))))
+                identity.agent, ctx.root.display(), table(&state, &mine, false))))
         }
         Commands::Add {
             title,
@@ -624,7 +624,7 @@ fn run(cli: Cli) -> Result<Reply> {
                     .collect::<Vec<_>>()
                     .join("\n")
             } else {
-                table(&state, &tasks)
+                table(&state, &tasks, status == "complete")
             };
             Ok(Reply::new(
                 json!(tasks
@@ -667,7 +667,7 @@ fn run(cli: Cli) -> Result<Reply> {
                     .iter()
                     .map(|task| engine::view(&state, task, &identity.agent, false))
                     .collect::<Vec<_>>()),
-                table(&state, &tasks),
+                table(&state, &tasks, false),
             ))
         }
         Commands::Next { stream, tag } => claimed_reply(
@@ -1020,9 +1020,32 @@ fn claimed_reply(identity: &Identity, claimed: Option<(State, String)>) -> Resul
     })
 }
 
-fn table(state: &State, tasks: &[&Task]) -> String {
+fn table(state: &State, tasks: &[&Task], show_completion: bool) -> String {
     if tasks.is_empty() {
         return "No tasks found.".into();
+    }
+    if show_completion {
+        let mut text = format!(
+            "{:<20} {:<8} {:<12} {:<12} TITLE\n",
+            "ID", "PRIORITY", "COMPLETED", "RESOLUTION"
+        );
+        for task in tasks {
+            text.push_str(&format!(
+                "{:<20} {:<8} {:<12} {:<12} {}\n",
+                task.id,
+                task.priority.as_deref().unwrap_or("p2"),
+                task.completed
+                    .map(|dt| dt.format("%Y-%m-%d").to_string())
+                    .unwrap_or_else(|| "-".to_string()),
+                task.resolution.as_deref().unwrap_or("-"),
+                task.title
+                    .chars()
+                    .take(80)
+                    .collect::<String>()
+                    .replace('\n', " ")
+            ));
+        }
+        return text.trim_end().to_string();
     }
     let mut text = format!(
         "{:<20} {:<12} {:<8} {:<20} TITLE\n",
@@ -1208,7 +1231,7 @@ fn stream_command(
                 .filter(|task| task.status == TaskStatus::Open)
                 .count();
             let complete = tasks.len() - open;
-            let text = format!("ID:          {}\nName:        {}\nDescription: {}\n\nTasks: {open} open, {complete} complete\n{}", stream.id, stream.name, stream.description.as_deref().unwrap_or_default(), table(&state, &tasks));
+            let text = format!("ID:          {}\nName:        {}\nDescription: {}\n\nTasks: {open} open, {complete} complete\n{}", stream.id, stream.name, stream.description.as_deref().unwrap_or_default(), table(&state, &tasks, false));
             Ok(Reply::new(
                 json!({"stream": stream, "open": open, "complete": complete, "tasks": tasks.iter().map(|task| engine::view(&state, task, &identity.agent, false)).collect::<Vec<_>>()}),
                 text,
