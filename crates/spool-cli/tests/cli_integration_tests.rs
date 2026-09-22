@@ -946,3 +946,115 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_list_filter_created_after() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-old","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-new","ts":"2024-06-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"New task"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-after", "2024-03-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-new"))
+        .stdout(predicate::str::contains("task-old").not());
+}
+
+#[test]
+fn test_list_filter_created_before() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-old","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-new","ts":"2024-06-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"New task"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-before", "2024-03-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-old"))
+        .stdout(predicate::str::contains("task-new").not());
+}
+
+#[test]
+fn test_list_filter_created_date_range() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-jan","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"January task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-apr","ts":"2024-04-10T10:00:00Z","by":"@tester","branch":"main","d":{"title":"April task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-sep","ts":"2024-09-20T10:00:00Z","by":"@tester","branch":"main","d":{"title":"September task"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args([
+            "list",
+            "--created-after",
+            "2024-03-01",
+            "--created-before",
+            "2024-08-31",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-apr"))
+        .stdout(predicate::str::contains("task-jan").not())
+        .stdout(predicate::str::contains("task-sep").not());
+}
+
+#[test]
+fn test_list_filter_updated_after() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Updated task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"update","id":"task-002","ts":"2024-07-01T09:00:00Z","by":"@tester","branch":"main","d":{"title":"Updated task (revised)"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--updated-after", "2024-06-01"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-002"))
+        .stdout(predicate::str::contains("task-001").not());
+}
+
+#[test]
+fn test_list_filter_invalid_date_format() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--created-after", "not-a-date"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid date"));
+}
