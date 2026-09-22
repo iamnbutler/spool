@@ -3,7 +3,7 @@ use crate::engine::{self, Identity, ReadyFilter, SpoolError};
 use crate::event::Operation;
 use crate::state::{load_or_materialize_state, State, Task, TaskStatus};
 use anyhow::{anyhow, Result};
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -166,6 +166,18 @@ pub enum Commands {
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table", value_parser = ["table", "json", "ids"])]
         format: String,
+        /// Show only tasks created on or after this date (YYYY-MM-DD, inclusive)
+        #[arg(long)]
+        created_after: Option<String>,
+        /// Show only tasks created on or before this date (YYYY-MM-DD, inclusive)
+        #[arg(long)]
+        created_before: Option<String>,
+        /// Show only tasks updated on or after this date (YYYY-MM-DD, inclusive)
+        #[arg(long)]
+        updated_after: Option<String>,
+        /// Show only tasks updated on or before this date (YYYY-MM-DD, inclusive)
+        #[arg(long)]
+        updated_before: Option<String>,
     },
     /// Show details of a specific task
     Show {
@@ -552,6 +564,10 @@ fn run(cli: Cli) -> Result<Reply> {
             search,
             limit,
             format,
+            created_after,
+            created_before,
+            updated_after,
+            updated_before,
         } => {
             let state = load_or_materialize_state(&ctx)?;
             let selected = stream
@@ -559,6 +575,34 @@ fn run(cli: Cli) -> Result<Reply> {
                 .map(|name| engine::stream(&state, &name).map(|stream| stream.id.clone()))
                 .transpose()?;
             let query = search.map(|text| text.to_lowercase());
+            let created_after_date = created_after
+                .as_deref()
+                .map(|s| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .map_err(|_| anyhow!("invalid date '{}': expected YYYY-MM-DD", s))
+                })
+                .transpose()?;
+            let created_before_date = created_before
+                .as_deref()
+                .map(|s| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .map_err(|_| anyhow!("invalid date '{}': expected YYYY-MM-DD", s))
+                })
+                .transpose()?;
+            let updated_after_date = updated_after
+                .as_deref()
+                .map(|s| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .map_err(|_| anyhow!("invalid date '{}': expected YYYY-MM-DD", s))
+                })
+                .transpose()?;
+            let updated_before_date = updated_before
+                .as_deref()
+                .map(|s| {
+                    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+                        .map_err(|_| anyhow!("invalid date '{}': expected YYYY-MM-DD", s))
+                })
+                .transpose()?;
             let mut tasks: Vec<_> = state
                 .tasks
                 .values()
@@ -610,6 +654,18 @@ fn run(cli: Cli) -> Result<Reply> {
                                 .to_lowercase()
                                 .contains(query)
                             })
+                            .unwrap_or(true)
+                        && created_after_date
+                            .map(|d| task.created.date_naive() >= d)
+                            .unwrap_or(true)
+                        && created_before_date
+                            .map(|d| task.created.date_naive() <= d)
+                            .unwrap_or(true)
+                        && updated_after_date
+                            .map(|d| task.updated.date_naive() >= d)
+                            .unwrap_or(true)
+                        && updated_before_date
+                            .map(|d| task.updated.date_naive() <= d)
                             .unwrap_or(true)
                 })
                 .collect();
