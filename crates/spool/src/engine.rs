@@ -166,6 +166,21 @@ pub fn sort_tasks(tasks: &mut Vec<&Task>) {
     });
 }
 
+/// Sort tasks by an explicit key: "priority" (default), "title", "updated", or "created".
+pub fn sort_tasks_by_key(tasks: &mut Vec<&Task>, key: &str) {
+    match key {
+        "title" => tasks.sort_by(|a, b| {
+            a.title
+                .to_lowercase()
+                .cmp(&b.title.to_lowercase())
+                .then(a.id.cmp(&b.id))
+        }),
+        "updated" => tasks.sort_by(|a, b| b.updated.cmp(&a.updated).then(a.id.cmp(&b.id))),
+        "created" => tasks.sort_by(|a, b| a.created.cmp(&b.created).then(a.id.cmp(&b.id))),
+        _ => sort_tasks(tasks),
+    }
+}
+
 pub fn view(state: &State, task: &Task, agent: &str, full: bool) -> Value {
     let now = Utc::now();
     let mut value = if full {
