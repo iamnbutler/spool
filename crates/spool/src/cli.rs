@@ -166,6 +166,9 @@ pub enum Commands {
         /// Output format: table, json, or ids
         #[arg(short, long, default_value = "table", value_parser = ["table", "json", "ids"])]
         format: String,
+        /// Sort order: priority (default), title, updated, or created
+        #[arg(long, value_parser = ["priority", "title", "updated", "created"])]
+        sort: Option<String>,
     },
     /// Show details of a specific task
     Show {
@@ -552,6 +555,7 @@ fn run(cli: Cli) -> Result<Reply> {
             search,
             limit,
             format,
+            sort,
         } => {
             let state = load_or_materialize_state(&ctx)?;
             let selected = stream
@@ -613,7 +617,10 @@ fn run(cli: Cli) -> Result<Reply> {
                             .unwrap_or(true)
                 })
                 .collect();
-            engine::sort_tasks(&mut tasks);
+            match sort.as_deref() {
+                Some(key) => engine::sort_tasks_by_key(&mut tasks, key),
+                None => engine::sort_tasks(&mut tasks),
+            }
             if let Some(limit) = limit {
                 tasks.truncate(limit);
             }

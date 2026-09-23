@@ -946,3 +946,79 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_list_sort_by_title() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-zzz","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Zebra task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-aaa","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Apple task","priority":"p3"}}"#
+        ),
+    );
+
+    // Default sort: p1 before p3 (priority order)
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::function(|output: &str| {
+            let pos_zebra = output.find("Zebra task").unwrap_or(usize::MAX);
+            let pos_apple = output.find("Apple task").unwrap_or(0);
+            pos_zebra < pos_apple
+        }));
+
+    // --sort title: Apple before Zebra
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--sort", "title"])
+        .assert()
+        .success()
+        .stdout(predicate::function(|output: &str| {
+            let pos_apple = output.find("Apple task").unwrap_or(usize::MAX);
+            let pos_zebra = output.find("Zebra task").unwrap_or(0);
+            pos_apple < pos_zebra
+        }));
+}
+
+#[test]
+fn test_list_sort_by_created() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-new","ts":"2024-02-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Newer task","priority":"p2"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-old","ts":"2024-01-01T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Older task","priority":"p2"}}"#
+        ),
+    );
+
+    // --sort created: older task created first
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--sort", "created"])
+        .assert()
+        .success()
+        .stdout(predicate::function(|output: &str| {
+            let pos_old = output.find("Older task").unwrap_or(usize::MAX);
+            let pos_new = output.find("Newer task").unwrap_or(0);
+            pos_old < pos_new
+        }));
+}
+
+#[test]
+fn test_list_sort_invalid_rejected() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--sort", "foobar"])
+        .assert()
+        .failure();
+}
