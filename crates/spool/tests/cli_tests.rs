@@ -690,3 +690,33 @@ fn test_cli_parse_stream_delete() {
         panic!("Expected Stream command");
     }
 }
+
+#[test]
+fn test_cli_parse_stream_prune_dry_run() {
+    let cli = Cli::parse_from(["spool", "stream", "prune"]);
+
+    if let Commands::Stream { command } = cli.command {
+        if let StreamCommands::Prune { execute } = command {
+            assert!(!execute, "Default should be dry run (execute=false)");
+        } else {
+            panic!("Expected Stream Prune command");
+        }
+    } else {
+        panic!("Expected Stream command");
+    }
+}
+
+#[test]
+fn test_cli_parse_stream_prune_execute() {
+    let cli = Cli::parse_from(["spool", "stream", "prune", "--execute"]);
+
+    if let Commands::Stream { command } = cli.command {
+        if let StreamCommands::Prune { execute } = command {
+            assert!(execute, "Expected execute=true");
+        } else {
+            panic!("Expected Stream Prune command");
+        }
+    } else {
+        panic!("Expected Stream command");
+    }
+}

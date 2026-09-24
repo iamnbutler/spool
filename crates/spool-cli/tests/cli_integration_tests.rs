@@ -946,3 +946,99 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_stream_prune_dry_run_shows_prunable_streams() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create_stream","id":"str-empty","ts":"2024-01-15T09:00:00Z","by":"@tester","branch":"main","d":{"name":"empty-stream"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create_stream","id":"str-done","ts":"2024-01-15T09:01:00Z","by":"@tester","branch":"main","d":{"name":"done-stream"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Completed task","stream":"str-done"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-001","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    // Dry run should list both prunable streams without deleting them
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "prune"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("can be pruned"))
+        .stdout(predicate::str::contains("--execute"));
+
+    // Streams should still exist after dry run
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("empty-stream"))
+        .stdout(predicate::str::contains("done-stream"));
+}
+
+#[test]
+fn test_stream_prune_execute_deletes_completed_streams() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create_stream","id":"str-done","ts":"2024-01-15T09:00:00Z","by":"@tester","branch":"main","d":{"name":"finished-work"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Done task","stream":"str-done"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-001","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "prune", "--execute"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Pruned 1 stream(s)"));
+
+    // Stream should be gone
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("finished-work").not());
+}
+
+#[test]
+fn test_stream_prune_skips_streams_with_open_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create_stream","id":"str-active","ts":"2024-01-15T09:00:00Z","by":"@tester","branch":"main","d":{"name":"active-stream"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task","stream":"str-active"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "prune", "--execute"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No prunable streams found"));
+
+    // Stream should still exist
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("active-stream"));
+}

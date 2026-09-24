@@ -297,6 +297,12 @@ pub enum StreamCommands {
         /// Stream ID
         id: String,
     },
+    /// List streams with no open tasks; use --execute to delete them
+    Prune {
+        /// Actually delete prunable streams (default is dry run)
+        #[arg(long)]
+        execute: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -1213,6 +1219,97 @@ fn stream_command(
                 json!({"stream": stream, "open": open, "complete": complete, "tasks": tasks.iter().map(|task| engine::view(&state, task, &identity.agent, false)).collect::<Vec<_>>()}),
                 text,
             ))
+        }
+        StreamCommands::Prune { execute } => {
+            let state = load_or_materialize_state(ctx)?;
+            let mut prunable: Vec<_> = state
+                .streams
+                .values()
+                .filter(|stream| {
+                    !state.tasks.values().any(|task| {
+                        task.stream.as_deref() == Some(&stream.id)
+                            && task.archived.is_none()
+                            && task.status == TaskStatus::Open
+                    })
+                })
+                .collect();
+            prunable.sort_by(|a, b| (&a.name, &a.id).cmp(&(&b.name, &b.id)));
+            if prunable.is_empty() {
+                return Ok(Reply::new(
+                    json!({"pruned": [], "dry_run": !execute}),
+                    "No prunable streams found. All streams have open tasks.",
+                ));
+            }
+            if !execute {
+                let mut text = format!(
+                    "{} stream(s) can be pruned (use --execute to delete):\n",
+                    prunable.len()
+                );
+                for stream in &prunable {
+                    let to_archive = state
+                        .tasks
+                        .values()
+                        .filter(|t| {
+                            t.stream.as_deref() == Some(&stream.id) && t.archived.is_none()
+                        })
+                        .count();
+                    if to_archive > 0 {
+                        text.push_str(&format!(
+                            "  {} ({}) — {} task(s) will be archived on execute\n",
+                            stream.name, stream.id, to_archive
+                        ));
+                    } else {
+                        text.push_str(&format!("  {} ({})\n", stream.name, stream.id));
+                    }
+                }
+                return Ok(Reply::new(
+                    json!({"would_prune": prunable.iter().map(|s| json!(s)).collect::<Vec<_>>(), "dry_run": true}),
+                    text.trim_end(),
+                ));
+            }
+            let archive_ref = Utc::now().format("%Y-%m").to_string();
+            let mut pruned = Vec::new();
+            for stream in &prunable {
+                let stream_id = stream.id.clone();
+                let task_ids: Vec<_> = state
+                    .tasks
+                    .values()
+                    .filter(|task| {
+                        task.stream.as_deref() == Some(&stream_id)
+                            && task.archived.is_none()
+                            && task.status == TaskStatus::Complete
+                    })
+                    .map(|task| task.id.clone())
+                    .collect();
+                for task_id in task_ids {
+                    engine::commit(
+                        ctx,
+                        engine::event(
+                            Operation::Archive,
+                            &task_id,
+                            &identity.agent,
+                            json!({"ref": archive_ref}),
+                        )?,
+                        None,
+                    )?;
+                }
+                engine::commit(
+                    ctx,
+                    engine::event(Operation::DeleteStream, &stream_id, &identity.agent, json!({}))?,
+                    None,
+                )?;
+                pruned.push(stream_id);
+            }
+            let text = format!(
+                "Pruned {} stream(s):\n{}",
+                pruned.len(),
+                pruned
+                    .iter()
+                    .map(|id| format!("  {id}"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+            Ok(Reply::new(json!({"pruned": pruned}), text))
         }
         command => {
             let (operation, id, data, label) = match command {
