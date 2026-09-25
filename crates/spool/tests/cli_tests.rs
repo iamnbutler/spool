@@ -690,3 +690,25 @@ fn test_cli_parse_stream_delete() {
         panic!("Expected Stream command");
     }
 }
+
+#[test]
+fn test_cli_parse_stats_defaults() {
+    let cli = Cli::parse_from(["spool", "stats"]);
+
+    if let Commands::Stats { format } = cli.command {
+        assert_eq!(format, "table");
+    } else {
+        panic!("Expected Stats command");
+    }
+}
+
+#[test]
+fn test_cli_parse_stats_json_format() {
+    let cli = Cli::parse_from(["spool", "stats", "--format", "json"]);
+
+    if let Commands::Stats { format } = cli.command {
+        assert_eq!(format, "json");
+    } else {
+        panic!("Expected Stats command");
+    }
+}

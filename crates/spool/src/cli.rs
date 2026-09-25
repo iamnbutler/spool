@@ -41,6 +41,12 @@ pub enum Commands {
     Whoami,
     /// Summarize the board and this agent's work
     Status,
+    /// Show task count statistics broken down by status, priority, and stream
+    Stats {
+        /// Output format: table or json
+        #[arg(short, long, default_value = "table", value_parser = ["table", "json"])]
+        format: String,
+    },
     /// Export the shared board's durable events to this checkout for Git
     Sync,
     /// List unclaimed work with completed prerequisites, in priority order
@@ -373,7 +379,7 @@ Use --stream, list --mine, --search, and --limit to keep context focused.
 fn format_is_json(cli: &Cli) -> bool {
     cli.json
         || matches!(&cli.command,
-        Commands::List { format, .. } | Commands::Stream { command: StreamCommands::List { format } }
+        Commands::List { format, .. } | Commands::Stream { command: StreamCommands::List { format } } | Commands::Stats { format }
         if format == "json")
 }
 
@@ -516,6 +522,126 @@ fn run(cli: Cli) -> Result<Reply> {
                 "mine": mine.iter().map(|task| engine::view(&state, task, &identity.agent, false)).collect::<Vec<_>>()});
             Ok(Reply::new(value, format!("{}\nBoard: {}\n{ready} ready for you · {active} in progress · {blocked} blocked · {complete} complete\n{}",
                 identity.agent, ctx.root.display(), table(&state, &mine))))
+        }
+        Commands::Stats { .. } => {
+            let state = load_or_materialize_state(&ctx)?;
+            let now = Utc::now();
+            let mut total = 0usize;
+            let mut status_open = 0usize;
+            let mut status_ip = 0usize;
+            let mut status_blocked = 0usize;
+            let mut status_complete = 0usize;
+            let mut prio_p0 = 0usize;
+            let mut prio_p1 = 0usize;
+            let mut prio_p2 = 0usize;
+            let mut prio_p3 = 0usize;
+            let mut prio_none = 0usize;
+            // stream_id -> (name, open, in_progress, blocked, complete)
+            let mut stream_stats: std::collections::HashMap<
+                String,
+                (String, usize, usize, usize, usize),
+            > = std::collections::HashMap::new();
+            let mut unstreamed = (0usize, 0usize, 0usize, 0usize);
+            for task in state.tasks.values().filter(|t| t.archived.is_none()) {
+                total += 1;
+                let ws = engine::work_status(&state, task, now);
+                match ws {
+                    "open" => status_open += 1,
+                    "in_progress" => status_ip += 1,
+                    "blocked" => status_blocked += 1,
+                    "complete" => status_complete += 1,
+                    _ => {}
+                }
+                match task.priority.as_deref().unwrap_or("") {
+                    "p0" => prio_p0 += 1,
+                    "p1" => prio_p1 += 1,
+                    "p3" => prio_p3 += 1,
+                    "" => prio_none += 1,
+                    _ => prio_p2 += 1,
+                }
+                match &task.stream {
+                    Some(stream_id) => {
+                        let name = state
+                            .streams
+                            .get(stream_id)
+                            .map(|s| s.name.clone())
+                            .unwrap_or_else(|| stream_id.clone());
+                        let e = stream_stats
+                            .entry(stream_id.clone())
+                            .or_insert((name, 0, 0, 0, 0));
+                        match ws {
+                            "open" => e.1 += 1,
+                            "in_progress" => e.2 += 1,
+                            "blocked" => e.3 += 1,
+                            "complete" => e.4 += 1,
+                            _ => {}
+                        }
+                    }
+                    None => match ws {
+                        "open" => unstreamed.0 += 1,
+                        "in_progress" => unstreamed.1 += 1,
+                        "blocked" => unstreamed.2 += 1,
+                        "complete" => unstreamed.3 += 1,
+                        _ => {}
+                    },
+                }
+            }
+            let mut text = format!(
+                "{total} tasks total · {status_open} open · {status_ip} in progress · {status_blocked} blocked · {status_complete} complete"
+            );
+            text.push_str(&format!(
+                "\n\nBy priority:\n  p0: {prio_p0}   p1: {prio_p1}   p2: {prio_p2}   p3: {prio_p3}   (none): {prio_none}"
+            ));
+            if !stream_stats.is_empty() || unstreamed != (0, 0, 0, 0) {
+                text.push_str(&format!(
+                    "\n\nBy stream:\n  {:<26} {:>5}  {:>11}  {:>7}  {:>8}",
+                    "NAME", "OPEN", "IN_PROGRESS", "BLOCKED", "COMPLETE"
+                ));
+                let mut sorted: Vec<_> = stream_stats.values().collect();
+                sorted.sort_by_key(|(name, ..)| name.as_str());
+                for (name, open, ip, blocked, complete) in &sorted {
+                    text.push_str(&format!(
+                        "\n  {:<26} {:>5}  {:>11}  {:>7}  {:>8}",
+                        name, open, ip, blocked, complete
+                    ));
+                }
+                text.push_str(&format!(
+                    "\n  {:<26} {:>5}  {:>11}  {:>7}  {:>8}",
+                    "(none)", unstreamed.0, unstreamed.1, unstreamed.2, unstreamed.3
+                ));
+            }
+            let mut stream_values: Vec<_> = stream_stats
+                .iter()
+                .map(|(id, (name, open, ip, blocked, complete))| {
+                    json!({
+                        "id": id,
+                        "name": name,
+                        "open": open,
+                        "in_progress": ip,
+                        "blocked": blocked,
+                        "complete": complete,
+                    })
+                })
+                .collect();
+            stream_values.sort_by_key(|v| v["name"].as_str().unwrap_or("").to_string());
+            let value = json!({
+                "total": total,
+                "by_status": {
+                    "open": status_open,
+                    "in_progress": status_ip,
+                    "blocked": status_blocked,
+                    "complete": status_complete,
+                },
+                "by_priority": {
+                    "p0": prio_p0,
+                    "p1": prio_p1,
+                    "p2": prio_p2,
+                    "p3": prio_p3,
+                    "none": prio_none,
+                },
+                "by_stream": stream_values,
+            });
+            Ok(Reply::new(value, text))
         }
         Commands::Add {
             title,
