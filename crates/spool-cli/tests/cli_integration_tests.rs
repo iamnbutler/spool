@@ -946,3 +946,130 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_stats_empty_board() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 tasks total"));
+}
+
+#[test]
+fn test_stats_counts_by_status() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Another open","priority":"p2"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-003","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"title":"To complete","priority":"p0"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-003","ts":"2024-01-15T13:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3 tasks total"))
+        .stdout(predicate::str::contains("2 open"))
+        .stdout(predicate::str::contains("1 complete"));
+}
+
+#[test]
+fn test_stats_by_priority() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"P0 task","priority":"p0"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"P1 task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-003","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"title":"No priority task"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("By priority:"))
+        .stdout(predicate::str::contains("p0: 1"))
+        .stdout(predicate::str::contains("p1: 1"))
+        .stdout(predicate::str::contains("(none): 1"));
+}
+
+#[test]
+fn test_stats_json_format() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Test task","priority":"p1"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stats", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"total\":"))
+        .stdout(predicate::str::contains("\"by_status\":"))
+        .stdout(predicate::str::contains("\"by_priority\":"))
+        .stdout(predicate::str::contains("\"by_stream\":"));
+}
+
+#[test]
+fn test_stats_by_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream first
+    let stream_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "my-project"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let stream_id = String::from_utf8_lossy(&stream_output);
+    let stream_id = stream_id
+        .split_whitespace()
+        .find(|s| s.contains('-'))
+        .unwrap_or("stream-001");
+
+    write_test_events(
+        &temp_dir,
+        &format!(
+            concat!(
+                r#"{{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{{"title":"Streamed task","stream":"{stream_id}"}}}}"#,
+                "\n",
+                r#"{{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{{"title":"Unstreamed task"}}}}"#,
+            ),
+            stream_id = stream_id
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("stats")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("By stream:"))
+        .stdout(predicate::str::contains("(none)"));
+}
