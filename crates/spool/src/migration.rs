@@ -288,7 +288,7 @@ fn get_migration_branch() -> String {
             return String::from_utf8_lossy(&output.stdout).trim().to_string();
         }
     }
-    "main".to_string()
+    "unknown".to_string()
 }
 
 #[cfg(test)]
