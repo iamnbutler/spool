@@ -946,3 +946,88 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_list_assignee_filter_at_prefix_agnostic() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Alice task","assignee":"@alice"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Bob task","assignee":"bob"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-003","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"title":"Unassigned"}}"#
+        ),
+    );
+
+    // without @ prefix matches @alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not())
+        .stdout(predicate::str::contains("task-003").not());
+
+    // with @ prefix also matches @alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // without @ prefix matches bob (stored without @)
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "bob"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001").not())
+        .stdout(predicate::str::contains("task-002"));
+
+    // @bob also matches bob (stored without @)
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@bob"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001").not())
+        .stdout(predicate::str::contains("task-002"));
+}
+
+#[test]
+fn test_list_assignee_filter_case_insensitive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Alice task","assignee":"@alice"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Other task"}}"#
+        ),
+    );
+
+    // uppercase ALICE matches @alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "ALICE"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+
+    // mixed case @Alice matches @alice
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--assignee", "@Alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"))
+        .stdout(predicate::str::contains("task-002").not());
+}
