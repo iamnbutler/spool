@@ -3,7 +3,7 @@ use crate::engine::{self, Identity, ReadyFilter, SpoolError};
 use crate::event::Operation;
 use crate::state::{load_or_materialize_state, State, Task, TaskStatus};
 use anyhow::{anyhow, Result};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 use std::path::PathBuf;
@@ -573,12 +573,7 @@ fn run(cli: Cli) -> Result<Reply> {
                         && status_matches
                         && assignee
                             .as_deref()
-                            .map(|agent| {
-                                task.assignee.as_deref() == Some(agent)
-                                    || task.claim.as_ref().is_some_and(|claim| {
-                                        claim.agent == agent && claim.is_live(Utc::now())
-                                    })
-                            })
+                            .map(|agent| assignee_matches(task, agent, Utc::now()))
                             .unwrap_or(true)
                         && tag
                             .as_deref()
@@ -966,6 +961,16 @@ fn belongs_to(task: &Task, agent: &str) -> bool {
             .claim
             .as_ref()
             .is_some_and(|claim| claim.agent == agent && claim.is_live(Utc::now()))
+}
+
+fn assignee_matches(task: &Task, filter: &str, now: DateTime<Utc>) -> bool {
+    let canon = |s: &str| s.trim_start_matches('@').to_ascii_lowercase();
+    let f = canon(filter);
+    task.assignee.as_deref().is_some_and(|a| canon(a) == f)
+        || task
+            .claim
+            .as_ref()
+            .is_some_and(|claim| canon(&claim.agent) == f && claim.is_live(now))
 }
 
 fn mutate(
