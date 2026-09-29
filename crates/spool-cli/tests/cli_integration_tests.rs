@@ -946,3 +946,68 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_update_no_fields_returns_error() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a task first
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--agent", "@tester", "add", "Task to update"])
+        .assert()
+        .success();
+
+    // Get the task ID
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let task_id = String::from_utf8(output).unwrap().trim().to_string();
+
+    // Update with no fields should fail
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--agent", "@tester", "update", &task_id])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No fields to update"));
+}
+
+#[test]
+fn test_stream_update_no_fields_returns_error() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream
+    let output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "My Stream"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_str = String::from_utf8(output).unwrap();
+    // Extract stream ID from "Created stream: my-stream (stream-id)" format
+    let stream_id = output_str
+        .split('(')
+        .nth(1)
+        .and_then(|s| s.split(')').next())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    // Update stream with no fields should fail
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "update", &stream_id])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No fields to update"));
+}

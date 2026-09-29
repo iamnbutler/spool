@@ -774,6 +774,11 @@ fn run(cli: Cli) -> Result<Reply> {
             if !remove_tag.is_empty() {
                 data["remove_tags"] = json!(remove_tag);
             }
+            if data.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                return Err(anyhow!(
+                    "No fields to update. Provide at least one of: --title, --description, --priority, --stream, --add-tag, or --remove-tag."
+                ));
+            }
             mutate(
                 &ctx,
                 &identity,
@@ -1234,6 +1239,11 @@ fn stream_command(
                     let mut data = json!({});
                     optional(&mut data, "name", name);
                     optional(&mut data, "description", description);
+                    if data.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                        return Err(anyhow!(
+                            "No fields to update. Provide at least one of: --name or --description."
+                        ));
+                    }
                     (Operation::UpdateStream, id, data, "Updated stream")
                 }
                 StreamCommands::Delete { id } => {
