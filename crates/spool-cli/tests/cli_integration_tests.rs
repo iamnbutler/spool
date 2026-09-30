@@ -946,3 +946,74 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+#[test]
+fn test_list_table_shows_stream_column_header() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Any task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("STREAM"));
+}
+
+#[test]
+fn test_list_shows_stream_name_for_streamed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "backend"])
+        .assert()
+        .success();
+
+    let id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success();
+    let stream_id = String::from_utf8_lossy(&id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Backend task", "--stream", &stream_id])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("backend"));
+}
+
+#[test]
+fn test_list_shows_dash_for_tasks_without_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Unstreamed task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("STREAM"))
+        .stdout(predicate::str::contains("Unstreamed task"));
+}
