@@ -1025,8 +1025,8 @@ fn table(state: &State, tasks: &[&Task]) -> String {
         return "No tasks found.".into();
     }
     let mut text = format!(
-        "{:<20} {:<12} {:<8} {:<20} TITLE\n",
-        "ID", "STATUS", "PRIORITY", "ASSIGNEE / AGENT"
+        "{:<20} {:<12} {:<8} {:<16} {:<20} TITLE\n",
+        "ID", "STATUS", "PRIORITY", "STREAM", "ASSIGNEE / AGENT"
     );
     for task in tasks {
         let agent = task
@@ -1036,11 +1036,19 @@ fn table(state: &State, tasks: &[&Task]) -> String {
             .map(|claim| claim.agent.as_str())
             .or(task.assignee.as_deref())
             .unwrap_or("-");
+        let stream_name = task
+            .stream
+            .as_deref()
+            .and_then(|id| state.streams.get(id))
+            .map(|s| s.name.as_str())
+            .unwrap_or("-");
+        let stream_display: String = stream_name.chars().take(16).collect();
         text.push_str(&format!(
-            "{:<20} {:<12} {:<8} {:<20} {}\n",
+            "{:<20} {:<12} {:<8} {:<16} {:<20} {}\n",
             task.id,
             engine::work_status(state, task, Utc::now()),
             task.priority.as_deref().unwrap_or("p2"),
+            stream_display,
             agent,
             task.title
                 .chars()
