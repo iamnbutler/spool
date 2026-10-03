@@ -270,7 +270,7 @@ pub enum StreamCommands {
     /// List all streams
     List {
         /// Output format: table, json, or ids
-        #[arg(short, long, default_value = "table")]
+        #[arg(short, long, default_value = "table", value_parser = ["table", "json", "ids"])]
         format: String,
     },
     /// Show details of a stream and its tasks
