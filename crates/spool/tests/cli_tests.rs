@@ -690,3 +690,24 @@ fn test_cli_parse_stream_delete() {
         panic!("Expected Stream command");
     }
 }
+
+#[test]
+fn test_cli_parse_stream_list_ids() {
+    let cli = Cli::parse_from(["spool", "stream", "list", "-f", "ids"]);
+
+    if let Commands::Stream { command } = cli.command {
+        if let StreamCommands::List { format } = command {
+            assert_eq!(format, "ids");
+        } else {
+            panic!("Expected Stream List command");
+        }
+    } else {
+        panic!("Expected Stream command");
+    }
+}
+
+#[test]
+fn test_cli_parse_stream_list_invalid_format_rejected() {
+    let result = Cli::try_parse_from(["spool", "stream", "list", "--format", "xml"]);
+    assert!(result.is_err(), "Expected error for invalid format value");
+}
