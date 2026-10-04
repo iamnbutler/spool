@@ -946,3 +946,331 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+// ==========================================
+// Comment / note tests
+// ==========================================
+
+#[test]
+fn test_comment_on_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    let add_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Task to comment on", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let add_json: serde_json::Value = serde_json::from_slice(&add_bytes).unwrap();
+    let task_id = add_json["id"].as_str().unwrap().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["comment", &task_id, "A helpful comment"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Commented on task"));
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", &task_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("A helpful comment"));
+}
+
+#[test]
+fn test_note_alias_comments_on_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    let add_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Task for note alias", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let add_json: serde_json::Value = serde_json::from_slice(&add_bytes).unwrap();
+    let task_id = add_json["id"].as_str().unwrap().to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["note", &task_id, "Note via alias"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Commented on task"));
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", &task_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Note via alias"));
+}
+
+// ==========================================
+// Block / unblock tests
+// ==========================================
+
+#[test]
+fn test_block_prevents_task_from_being_ready() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    let prereq_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Prerequisite task", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let prereq_id = serde_json::from_slice::<serde_json::Value>(&prereq_bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let dep_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Dependent task", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dep_id = serde_json::from_slice::<serde_json::Value>(&dep_bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["block", &dep_id, "--by", &prereq_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Blocked task"));
+
+    // Dependent task should show as blocked
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", &dep_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("blocked"));
+
+    // Dependent task should not appear in ready list
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Dependent task").not());
+}
+
+#[test]
+fn test_unblock_restores_task_to_ready() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    let prereq_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Prereq to unblock", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let prereq_id = serde_json::from_slice::<serde_json::Value>(&prereq_bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let dep_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Dep to unblock", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dep_id = serde_json::from_slice::<serde_json::Value>(&dep_bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["block", &dep_id, "--by", &prereq_id])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["unblock", &dep_id, "--by", &prereq_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Unblocked task"));
+
+    // Dependent task should now appear in ready list
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Dep to unblock"));
+}
+
+// ==========================================
+// Ready tests
+// ==========================================
+
+#[test]
+fn test_ready_shows_open_unclaimed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-ready","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Ready task","priority":"p1"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Ready task"));
+}
+
+#[test]
+fn test_ready_excludes_complete_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-open","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open ready task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-done","ts":"2024-01-15T10:01:00Z","by":"@tester","branch":"main","d":{"title":"Completed task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-done","ts":"2024-01-15T10:02:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#,
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Open ready task"))
+        .stdout(predicate::str::contains("Completed task").not());
+}
+
+#[test]
+fn test_ready_filters_by_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "mystream"])
+        .assert()
+        .success();
+
+    let stream_id = String::from_utf8_lossy(
+        &spool_cmd()
+            .current_dir(temp_dir.path())
+            .args(["stream", "list", "--format", "ids"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .trim()
+    .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Streamed task", "--stream", &stream_id])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Unstreamed task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready", "--stream", "mystream"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Streamed task"))
+        .stdout(predicate::str::contains("Unstreamed task").not());
+}
+
+// ==========================================
+// Release tests
+// ==========================================
+
+#[test]
+fn test_release_claimed_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    let add_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Task to release", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let task_id = serde_json::from_slice::<serde_json::Value>(&add_bytes).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Claim the task and extract the token from JSON output
+    let claim_bytes = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["claim", &task_id, "--agent", "test-agent-release", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let claim_json: serde_json::Value = serde_json::from_slice(&claim_bytes).unwrap();
+    let token = claim_json["claim"]["token"].as_str().unwrap().to_string();
+
+    // Release the task using the claim token
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args([
+            "release",
+            &task_id,
+            "--agent",
+            "test-agent-release",
+            "--token",
+            &token,
+            "--note",
+            "Returning to queue",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Released task"));
+
+    // Task should be ready again (no live claim)
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["ready"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Task to release"));
+}
