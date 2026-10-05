@@ -946,3 +946,213 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+// ==========================================
+// Whoami tests
+// ==========================================
+
+#[test]
+fn test_whoami_with_agent_flag() {
+    // whoami does not require an initialised spool directory
+    let temp_dir = TempDir::new().unwrap();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--agent", "test-agent", "whoami"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test-agent"))
+        .stdout(predicate::str::contains("--agent"));
+}
+
+// ==========================================
+// Status tests
+// ==========================================
+
+#[test]
+fn test_status_empty_board() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--agent", "test-agent", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test-agent"))
+        .stdout(predicate::str::contains("ready for you"));
+}
+
+#[test]
+fn test_status_with_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task","priority":"p1"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Completed task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-002","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--agent", "test-agent", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete"));
+}
+
+// ==========================================
+// Archive tests
+// ==========================================
+
+#[test]
+fn test_archive_no_completed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("archive")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Archived 0 tasks"));
+}
+
+#[test]
+fn test_archive_dry_run() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    // Completion timestamp is in 2024 — well before any 0-day cutoff
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old completed task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-001","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["archive", "--days", "0", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Would archive 1 tasks"));
+
+    // Dry-run must not actually archive: task should still appear in complete list
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "complete"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001"));
+}
+
+#[test]
+fn test_archive_archives_old_completed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old completed task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-001","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["archive", "--days", "0"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Archived 1 tasks"));
+
+    // After archiving, the task should no longer appear in list
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--status", "complete"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("task-001").not());
+}
+
+#[test]
+fn test_archive_skips_recently_completed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old completed"}}"#,
+            "\n",
+            r#"{"v":1,"op":"complete","id":"task-001","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"resolution":"done"}}"#
+        ),
+    );
+
+    // 365 days: task completed in 2024 would still qualify, but use a very large number
+    // to simulate "only archive tasks older than 9999 days" — nothing should be archived
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["archive", "--days", "9999"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Archived 0 tasks"));
+}
+
+// ==========================================
+// Link / Unlink tests
+// ==========================================
+
+#[test]
+fn test_link_parent_relationship() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Parent task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Child task"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["link", "task-002", "parent", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Linked task"));
+}
+
+#[test]
+fn test_unlink_removes_relationship() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Parent task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{"title":"Child task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"link","id":"task-002","ts":"2024-01-15T12:00:00Z","by":"@tester","branch":"main","d":{"rel":"parent","target":"task-001"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["unlink", "task-002", "parent", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Unlinked task"));
+}
