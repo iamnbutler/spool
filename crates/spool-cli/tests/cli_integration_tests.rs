@@ -946,3 +946,193 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+// ==========================================
+// next command tests
+// ==========================================
+
+#[test]
+fn test_next_no_ready_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["next", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No ready tasks."));
+}
+
+#[test]
+fn test_next_json_returns_null_when_no_work() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--json", "next", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match("^null\n$").unwrap());
+}
+
+#[test]
+fn test_next_claims_ready_task() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Claimable task"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["next", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Claimed task:"))
+        .stdout(predicate::str::contains("Claimable task"));
+}
+
+#[test]
+fn test_next_claims_highest_priority_first() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Low priority task", "--priority", "p2"])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "High priority task", "--priority", "p0"])
+        .assert()
+        .success();
+
+    // next should claim the highest priority (p0) task first
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["next", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Claimed task:"))
+        .stdout(predicate::str::contains("High priority task"));
+}
+
+#[test]
+fn test_next_stream_filter_claims_only_matching_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "Frontend"])
+        .assert()
+        .success();
+
+    let stream_id = String::from_utf8_lossy(
+        &spool_cmd()
+            .current_dir(temp_dir.path())
+            .args(["stream", "list", "--format", "ids"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .trim()
+    .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Frontend task", "--stream", &stream_id])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "No-stream task"])
+        .assert()
+        .success();
+
+    // next with stream filter should only claim from the specified stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["next", "--stream", "Frontend", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Claimed task:"))
+        .stdout(predicate::str::contains("Frontend task"));
+
+    // No-stream task is still unclaimed but not in Frontend stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["next", "--stream", "Frontend", "--agent", "test-agent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No ready tasks."));
+}
+
+// ==========================================
+// renew command tests
+// ==========================================
+
+#[test]
+fn test_renew_extends_claim() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Renewable task"}}"#,
+    );
+
+    // Claim with JSON output to capture the token
+    let claim_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["--json", "claim", "task-001", "--agent", "test-agent"])
+        .assert()
+        .success();
+
+    let claim_json: serde_json::Value =
+        serde_json::from_slice(&claim_output.get_output().stdout).unwrap();
+    let token = claim_json["claim"]["token"]
+        .as_str()
+        .expect("token present in claim response");
+
+    // Renew the claim using the captured token
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args([
+            "renew",
+            "task-001",
+            "--token",
+            token,
+            "--agent",
+            "test-agent",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Renewed claim: task-001"));
+}
+
+#[test]
+fn test_renew_unclaimed_task_fails() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Unclaimed task"}}"#,
+    );
+
+    // Renew without a prior claim should fail
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["renew", "task-001", "--agent", "test-agent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no claim to renew"));
+}
