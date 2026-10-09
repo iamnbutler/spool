@@ -1174,6 +1174,40 @@ impl App {
             ctx: SpoolContext::new(PathBuf::from("/nonexistent")),
         }
     }
+
+    /// Apply the current `status_filter`, `stream_filter`, `search_query`, and `sort_by`
+    /// to a provided list of tasks. Mirrors the filter chain in `reload_tasks()` without
+    /// requiring disk I/O, so filter and sort logic can be tested in isolation.
+    fn apply_filters_and_sort(&self, all_tasks: Vec<Task>) -> Vec<Task> {
+        let query = self.search_query.to_lowercase();
+        let stream_filter = self.stream_filter.clone();
+        let mut tasks: Vec<Task> = all_tasks
+            .into_iter()
+            .filter(|t| match self.status_filter {
+                StatusFilter::Open => t.status == TaskStatus::Open,
+                StatusFilter::Complete => t.status == TaskStatus::Complete,
+                StatusFilter::All => true,
+            })
+            .filter(|t| match &stream_filter {
+                None => true,
+                Some(stream_id) => t.stream.as_ref() == Some(stream_id),
+            })
+            .filter(|t| {
+                if query.is_empty() {
+                    true
+                } else {
+                    t.title.to_lowercase().contains(&query)
+                        || t.description
+                            .as_ref()
+                            .map(|d| d.to_lowercase().contains(&query))
+                            .unwrap_or(false)
+                        || t.tags.iter().any(|tag| tag.to_lowercase().contains(&query))
+                }
+            })
+            .collect();
+        self.sort_tasks(&mut tasks);
+        tasks
+    }
 }
 
 #[cfg(test)]
@@ -1966,5 +2000,236 @@ mod tests {
     fn test_selected_history_event_none_when_empty() {
         let app = App::new_for_test(vec![]);
         assert!(app.selected_history_event().is_none());
+    }
+
+    // --- Combined filter and sort logic ---
+
+    fn make_task_with_status(id: &str, title: &str, status: TaskStatus) -> Task {
+        let mut t = make_task(id, title);
+        t.status = status;
+        t
+    }
+
+    fn make_task_in_stream(id: &str, title: &str, stream_id: &str) -> Task {
+        let mut t = make_task(id, title);
+        t.stream = Some(stream_id.to_string());
+        t
+    }
+
+    #[test]
+    fn test_status_open_filters_out_complete_tasks() {
+        let tasks = vec![
+            make_task_with_status("t1", "Open task", TaskStatus::Open),
+            make_task_with_status("t2", "Done task", TaskStatus::Complete),
+        ];
+        let app = App::new_for_test(vec![]); // status_filter defaults to Open
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_status_complete_filters_out_open_tasks() {
+        let tasks = vec![
+            make_task_with_status("t1", "Open task", TaskStatus::Open),
+            make_task_with_status("t2", "Done task", TaskStatus::Complete),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::Complete;
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t2");
+    }
+
+    #[test]
+    fn test_status_all_returns_both_open_and_complete() {
+        let tasks = vec![
+            make_task_with_status("t1", "Open task", TaskStatus::Open),
+            make_task_with_status("t2", "Done task", TaskStatus::Complete),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_stream_filter_limits_to_matching_stream() {
+        let tasks = vec![
+            make_task_in_stream("t1", "Alpha", "stream-a"),
+            make_task_in_stream("t2", "Beta", "stream-b"),
+            make_task("t3", "Gamma"), // no stream
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.stream_filter = Some("stream-a".to_string());
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_status_and_stream_filter_combine() {
+        let t1 = make_task_in_stream("t1", "Open in A", "stream-a");
+        // t1 is Open (default)
+        let mut t2 = make_task_in_stream("t2", "Done in A", "stream-a");
+        t2.status = TaskStatus::Complete;
+        let t3 = make_task_in_stream("t3", "Open in B", "stream-b");
+
+        let mut app = App::new_for_test(vec![]);
+        // status_filter = Open (default), stream_filter = stream-a
+        app.stream_filter = Some("stream-a".to_string());
+        let result = app.apply_filters_and_sort(vec![t1, t2, t3]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_search_matches_title_case_insensitively() {
+        let tasks = vec![
+            make_task("t1", "Fix the Login bug"),
+            make_task("t2", "Add dark mode"),
+            make_task("t3", "LOGIN refactor"),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.search_query = "login".to_string();
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 2);
+        let ids: Vec<&str> = result.iter().map(|t| t.id.as_str()).collect();
+        assert!(ids.contains(&"t1"));
+        assert!(ids.contains(&"t3"));
+    }
+
+    #[test]
+    fn test_search_matches_description() {
+        let mut t1 = make_task("t1", "Task One");
+        t1.description = Some("Involves database migration".to_string());
+        let t2 = make_task("t2", "Task Two");
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.search_query = "database".to_string();
+        let result = app.apply_filters_and_sort(vec![t1, t2]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_search_matches_tags() {
+        let mut t1 = make_task("t1", "Task One");
+        t1.tags = vec!["backend".to_string(), "urgent".to_string()];
+        let mut t2 = make_task("t2", "Task Two");
+        t2.tags = vec!["frontend".to_string()];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.search_query = "urgent".to_string();
+        let result = app.apply_filters_and_sort(vec![t1, t2]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_status_and_search_combine() {
+        let tasks = vec![
+            make_task_with_status("t1", "Fix login bug", TaskStatus::Open),
+            make_task_with_status("t2", "Fix login ui", TaskStatus::Complete),
+            make_task_with_status("t3", "Unrelated open task", TaskStatus::Open),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::Open;
+        app.search_query = "login".to_string();
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_all_three_filters_combine() {
+        let t1 = make_task_in_stream("t1", "Fix login bug", "backend");
+        // t1 is Open (default)
+        let mut t2 = make_task_in_stream("t2", "Fix logout bug", "backend");
+        t2.status = TaskStatus::Complete;
+        let t3 = make_task_in_stream("t3", "Fix ui login", "frontend");
+        // t3 is Open but wrong stream
+        let t4 = make_task_in_stream("t4", "Unrelated task", "backend");
+        // t4 is Open, right stream, no search match
+
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::Open;
+        app.stream_filter = Some("backend".to_string());
+        app.search_query = "login".to_string();
+        let result = app.apply_filters_and_sort(vec![t1, t2, t3, t4]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "t1");
+    }
+
+    #[test]
+    fn test_sort_by_priority_orders_p0_before_p3() {
+        let mut t1 = make_task("t1", "Low priority");
+        t1.priority = Some("p3".to_string());
+        let mut t2 = make_task("t2", "High priority");
+        t2.priority = Some("p0".to_string());
+        let mut t3 = make_task("t3", "Medium priority");
+        t3.priority = Some("p1".to_string());
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.sort_by = SortBy::Priority;
+        let result = app.apply_filters_and_sort(vec![t1, t2, t3]);
+        assert_eq!(result[0].id, "t2"); // p0 first
+        assert_eq!(result[1].id, "t3"); // p1 second
+        assert_eq!(result[2].id, "t1"); // p3 last
+    }
+
+    #[test]
+    fn test_sort_by_title_orders_alphabetically() {
+        let tasks = vec![
+            make_task("t1", "Zebra task"),
+            make_task("t2", "Apple task"),
+            make_task("t3", "Mango task"),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.sort_by = SortBy::Title;
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result[0].id, "t2"); // Apple
+        assert_eq!(result[1].id, "t3"); // Mango
+        assert_eq!(result[2].id, "t1"); // Zebra
+    }
+
+    #[test]
+    fn test_filter_then_sort_applies_both_correctly() {
+        let t1 = make_task_in_stream("t1", "Zebra", "s1");
+        let t2 = make_task_in_stream("t2", "Apple", "s1");
+        let t3 = make_task_in_stream("t3", "Middle", "s2"); // excluded by stream filter
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.stream_filter = Some("s1".to_string());
+        app.sort_by = SortBy::Title;
+        let result = app.apply_filters_and_sort(vec![t1, t2, t3]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].id, "t2"); // Apple first
+        assert_eq!(result[1].id, "t1"); // Zebra second
+    }
+
+    #[test]
+    fn test_empty_search_query_does_not_filter() {
+        let tasks = vec![make_task("t1", "Task One"), make_task("t2", "Task Two")];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::All;
+        app.search_query = String::new();
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_no_matching_tasks_returns_empty() {
+        let tasks = vec![
+            make_task_with_status("t1", "Open task", TaskStatus::Open),
+            make_task_with_status("t2", "Other open", TaskStatus::Open),
+        ];
+        let mut app = App::new_for_test(vec![]);
+        app.status_filter = StatusFilter::Complete; // no complete tasks in input
+        let result = app.apply_filters_and_sort(tasks);
+        assert_eq!(result.len(), 0);
     }
 }
