@@ -946,3 +946,225 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+// ==========================================
+// Show command detail tests
+// ==========================================
+
+#[test]
+fn test_show_task_with_comment() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Commented task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"comment","id":"task-001","ts":"2024-01-15T11:00:00Z","by":"@reviewer","branch":"main","d":{"body":"Great work!","ref":"pr-42"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Comments:"))
+        .stdout(predicate::str::contains("@reviewer"))
+        .stdout(predicate::str::contains("Great work!"))
+        .stdout(predicate::str::contains("pr-42"));
+}
+
+#[test]
+fn test_show_task_with_blocks_and_blocked_by() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        concat!(
+            r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Blocking task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"create","id":"task-002","ts":"2024-01-15T10:01:00Z","by":"@tester","branch":"main","d":{"title":"Blocked task"}}"#,
+            "\n",
+            r#"{"v":1,"op":"link","id":"task-001","ts":"2024-01-15T10:02:00Z","by":"@tester","branch":"main","d":{"rel":"blocks","target":"task-002"}}"#,
+            "\n",
+            r#"{"v":1,"op":"link","id":"task-002","ts":"2024-01-15T10:03:00Z","by":"@tester","branch":"main","d":{"rel":"blocked_by","target":"task-001"}}"#
+        ),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", "task-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Blocks:"))
+        .stdout(predicate::str::contains("task-002"));
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["show", "task-002"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Blocked by:"))
+        .stdout(predicate::str::contains("task-001"));
+}
+
+#[test]
+fn test_update_task_set_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "Target Stream"])
+        .assert()
+        .success();
+
+    let id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success();
+    let stream_id = String::from_utf8_lossy(&id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    // Create a task without a stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Streamless task"])
+        .assert()
+        .success();
+
+    let task_id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .assert()
+        .success();
+    let task_id = String::from_utf8_lossy(&task_id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    // Move the task to the stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["update", &task_id, "--stream", &stream_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Updated task"));
+
+    // Verify the task now appears in the stream filter
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--stream", &stream_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Streamless task"));
+}
+
+#[test]
+fn test_update_task_remove_from_stream() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream and add a task to it
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "My Stream"])
+        .assert()
+        .success();
+
+    let id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success();
+    let stream_id = String::from_utf8_lossy(&id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Stream task", "--stream", &stream_id])
+        .assert()
+        .success();
+
+    let task_id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--format", "ids"])
+        .assert()
+        .success();
+    let task_id = String::from_utf8_lossy(&task_id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    // Remove the task from stream using --stream ""
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["update", &task_id, "--stream", ""])
+        .assert()
+        .success();
+
+    // Verify the task no longer appears in the stream filter
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--stream", &stream_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No tasks found"));
+
+    // Verify it appears in the no-stream filter
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["list", "--no-stream"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stream task"));
+}
+
+#[test]
+fn test_stream_show_with_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+
+    // Create a stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "add", "Work Stream"])
+        .assert()
+        .success();
+
+    let id_output = spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "list", "--format", "ids"])
+        .assert()
+        .success();
+    let stream_id = String::from_utf8_lossy(&id_output.get_output().stdout)
+        .trim()
+        .to_string();
+
+    // Add tasks to the stream
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Open stream task", "--stream", &stream_id])
+        .assert()
+        .success();
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["add", "Another task", "--stream", &stream_id, "-p", "p1"])
+        .assert()
+        .success();
+
+    // Show the stream and verify tasks appear
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["stream", "show", &stream_id])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Work Stream"))
+        .stdout(predicate::str::contains("2 open"))
+        .stdout(predicate::str::contains("Open stream task"))
+        .stdout(predicate::str::contains("Another task"));
+}
