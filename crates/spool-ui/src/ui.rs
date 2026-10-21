@@ -427,6 +427,23 @@ fn draw_task_detail(f: &mut Frame, area: Rect, app: &mut App) {
             ]));
         }
 
+        if !task.blocks.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Blocks: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(task.blocks.join(", "), Style::default().fg(Color::Red)),
+            ]));
+        }
+
+        if !task.blocked_by.is_empty() {
+            lines.push(Line::from(vec![
+                Span::styled("Blocked by: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    task.blocked_by.join(", "),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]));
+        }
+
         // Created timestamp
         lines.push(Line::from(vec![
             Span::styled("Created: ", Style::default().fg(Color::DarkGray)),
