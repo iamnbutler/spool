@@ -946,3 +946,145 @@ fn test_stream_list_json_format() {
         .stdout(predicate::str::contains("\"name\":"))
         .stdout(predicate::str::contains("json stream"));
 }
+
+// ===== Archive CLI tests =====
+
+#[test]
+fn test_archive_no_tasks_to_archive() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    // Only open tasks — nothing eligible for archiving
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Open task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("archive")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No tasks to archive"));
+}
+
+#[test]
+fn test_archive_dry_run() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    // Old completed task (2024-01-15 is well past the 30-day threshold)
+    write_test_events(
+        &temp_dir,
+        &[
+            r#"{"v":1,"op":"create","id":"old-task","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old completed task"}}"#,
+            r#"{"v":1,"op":"complete","id":"old-task","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{}}"#,
+        ]
+        .join("\n"),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["archive", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Would archive"));
+
+    // Dry run must not create any archive files
+    let archive_dir = temp_dir.path().join(".spool/archive");
+    let archive_files: Vec<_> = fs::read_dir(&archive_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+        .collect();
+    assert!(archive_files.is_empty());
+}
+
+#[test]
+fn test_archive_old_completed_tasks() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        &[
+            r#"{"v":1,"op":"create","id":"old-task","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Old completed task"}}"#,
+            r#"{"v":1,"op":"complete","id":"old-task","ts":"2024-01-15T11:00:00Z","by":"@tester","branch":"main","d":{}}"#,
+        ]
+        .join("\n"),
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("archive")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Archived"));
+}
+
+// ===== Validate edge-case CLI tests =====
+
+#[test]
+fn test_validate_strict_passes_on_valid_events() {
+    let temp_dir = TempDir::new().unwrap();
+    setup_initialized_spool(&temp_dir);
+    write_test_events(
+        &temp_dir,
+        r#"{"v":1,"op":"create","id":"task-001","ts":"2024-01-15T10:00:00Z","by":"@tester","branch":"main","d":{"title":"Valid task"}}"#,
+    );
+
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["validate", "--strict"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Validation passed"));
+}
+
+#[test]
+fn test_validate_reports_errors_exits_ok_non_strict() {
+    let temp_dir = TempDir::new().unwrap();
+    // Use `spool init` so version.json is present; migration won't run when we
+    // later add an invalid events file.
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("init")
+        .assert()
+        .success();
+    let events_dir = temp_dir.path().join(".spool/events");
+    fs::write(
+        events_dir.join("2024-01-15.jsonl"),
+        "this is not valid json\n",
+    )
+    .unwrap();
+
+    // Without --strict, invalid events are reported but the command exits 0
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("validate")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Errors"));
+}
+
+#[test]
+fn test_validate_strict_fails_on_invalid_events() {
+    let temp_dir = TempDir::new().unwrap();
+    // Use `spool init` so version.json is present; migration won't run when we
+    // later add an invalid events file.
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .arg("init")
+        .assert()
+        .success();
+    let events_dir = temp_dir.path().join(".spool/events");
+    fs::write(
+        events_dir.join("2024-01-15.jsonl"),
+        "this is not valid json\n",
+    )
+    .unwrap();
+
+    // With --strict, any errors cause a non-zero exit
+    spool_cmd()
+        .current_dir(temp_dir.path())
+        .args(["validate", "--strict"])
+        .assert()
+        .failure();
+}
